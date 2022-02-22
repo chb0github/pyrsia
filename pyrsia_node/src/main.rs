@@ -26,7 +26,6 @@ extern crate warp;
 use pyrsia::docker::error_util::*;
 use pyrsia::docker::v2::handlers::blobs::GetBlobsHandle;
 use pyrsia::docker::v2::routes::*;
-use pyrsia::document_store::document_store::DocumentStore;
 use pyrsia::document_store::document_store::IndexSpec;
 use pyrsia::logging::*;
 use pyrsia::network::swarm::{self, MyBehaviourSwarm};
@@ -41,16 +40,13 @@ use libp2p::{
     swarm::SwarmEvent,
     Multiaddr, PeerId,
 };
-use log::{debug, error, info};
+use log::{debug, info};
 use std::{
     env,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::Arc,
 };
-use tokio::{
-    io::{self, AsyncBufReadExt},
-    sync::{mpsc, Mutex, MutexGuard},
-};
+use tokio::sync::{mpsc, Mutex};
 use warp::Filter;
 
 const DEFAULT_HOST: &str = "127.0.0.1";
@@ -60,10 +56,11 @@ const DEFAULT_PORT: &str = "7888";
 async fn main() {
     pretty_env_logger::init();
 
-    // create the connection to the documentStore.
+    // Initiate the document store with it's first document
     let index_one = "index_one";
     let field1 = "most_significant_field";
-    let idx1 = IndexSpec::new(index_one, vec![field1]);
+    // The actual first index is not necessary here, it is preserved in the documentStore
+    IndexSpec::new(index_one, vec![field1]);
 
     let matches: ArgMatches = App::new("Pyrsia Node")
         .version("0.1.0")
@@ -77,7 +74,7 @@ async fn main() {
                 .default_value(DEFAULT_HOST)
                 .takes_value(true)
                 .required(false)
-                .multiple(false)
+                .multiple_occurrences(false)
                 .help("Sets the host address to bind to for the Docker API"),
         )
         .arg(
@@ -88,7 +85,7 @@ async fn main() {
                 .default_value(DEFAULT_PORT)
                 .takes_value(true)
                 .required(false)
-                .multiple(false)
+                .multiple_occurrences(false)
                 .help("Sets the port to listen to for the Docker API"),
         )
         .arg(
@@ -97,7 +94,7 @@ async fn main() {
                 .long("peer")
                 .takes_value(true)
                 .required(false)
-                .multiple(false)
+                .multiple_occurrences(false)
                 .help("Provide an explicit peerId to connect with"),
         )
         .get_matches();
@@ -130,9 +127,6 @@ async fn main() {
         swarm.dial(addr).unwrap();
         info!("Dialed {:?}", to_dial)
     }
-
-    // Read full lines from stdin
-    let mut stdin = io::BufReader::new(io::stdin()).lines();
 
     // Listen on all interfaces and whatever port the OS assigns
     swarm
@@ -184,13 +178,11 @@ async fn main() {
     );
 
     tokio::spawn(server);
-    let tx4 = tx.clone();
 
     // Kick it off
     loop {
         let evt = {
             tokio::select! {
-                line = stdin.next_line() => Some(EventType::Input(line.expect("can get line").expect("can read line from stdin"))),
                 message = rx.recv() => Some(EventType::Message(message.expect("message exists"))),
 
                 new_hash = blobs_need_hash.select_next_some() => {
@@ -213,15 +205,10 @@ async fn main() {
 
         if let Some(event) = evt {
             match event {
-                EventType::Response(resp) => {
-                    //here we have to manage which events to publish to floodsub
-                    swarm
-                        .behaviour_mut()
-                        .floodsub_mut()
-                        .publish(floodsub_topic.clone(), resp.as_bytes());
-                }
-                EventType::Input(line) => match line.as_str() {
-                    "peers" => swarm.behaviour_mut().list_peers_cmd().await,
+                EventType::Message(message) => match message.as_str() {
+                    cmd if cmd.starts_with("peers") || cmd.starts_with("status") => {
+                        swarm.behaviour_mut().list_peers(local_peer_id).await
+                    }
                     cmd if cmd.starts_with("magnet:") => {
                         info!(
                             "{}",
@@ -231,15 +218,6 @@ async fn main() {
                                 .publish(gossip_topic.clone(), cmd)
                                 .unwrap()
                         )
-                    }
-                    _ => match tx4.send(line).await {
-                        Ok(_) => debug!("line sent"),
-                        Err(_) => error!("failed to send stdin input"),
-                    },
-                },
-                EventType::Message(message) => match message.as_str() {
-                    cmd if cmd.starts_with("peers") || cmd.starts_with("status") => {
-                        swarm.behaviour_mut().list_peers(local_peer_id).await
                     }
                     cmd if cmd.starts_with("get_blobs") => {
                         swarm.behaviour_mut().lookup_blob(message).await
@@ -252,7 +230,5 @@ async fn main() {
 }
 
 enum EventType {
-    Response(String),
     Message(String),
-    Input(String),
 }
