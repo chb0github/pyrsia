@@ -20,11 +20,8 @@ use libp2p::identity;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use crate::notifier::OnBlockEvent;
-
 use super::block::*;
 use super::header::*;
-use super::notifier::OnTransactionSettled;
 
 /// BlockchainId identifies the current chain
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -106,9 +103,9 @@ pub struct Blockchain {
     // this seems suspicious to chris
     #[serde(skip)]
     // this should actually be a Map<Transaction,Vec<OnTransactionSettled>> but that's later
-    pub trans_observers: HashMap<Transaction, OnTransactionSettled>,
+    pub trans_observers: HashMap<Transaction, Box<dyn FnOnce(Transaction)>>,
     #[serde(skip)]
-    pub block_observers: Vec<OnBlockEvent>,
+    pub block_observers: Vec<Box<dyn FnMut(Block)>>,
     pub genesis_block: GenesisBlock,
     pub blocks: Vec<Block>,
 }
@@ -138,7 +135,7 @@ impl Blockchain {
     #[warn(dead_code)]
     pub fn add_block(&mut self, block: Block) -> &mut Self {
         self.blocks.push(block);
-        if let Some(mut block) = self.blocks.last() {
+        if let Some(block) = self.blocks.last() {
             self.notify_block_event(block.clone());
         }
         self
