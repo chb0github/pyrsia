@@ -13,12 +13,12 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-use std::collections::HashMap;
 use super::block::*;
 use super::header::*;
 use libp2p::identity;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
 /// BlockchainId identifies the current chain

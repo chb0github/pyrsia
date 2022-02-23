@@ -74,8 +74,8 @@ mod test {
     use rand::Rng;
 
     use crate::block::*;
-    use crate::blockchain::Blockchain;
     use crate::blockchain::generate_ed25519;
+    use crate::blockchain::Blockchain;
     use crate::header::{hash, Header, PartialHeader};
 
     #[test]
