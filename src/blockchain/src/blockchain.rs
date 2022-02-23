@@ -13,6 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+use std::collections::HashMap;
 use super::block::*;
 use super::header::*;
 use libp2p::identity;
@@ -94,8 +95,14 @@ impl GenesisBlock {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct Blockchain {
+    // this seems suspicious to chris
+    #[serde(skip)]
+    // this should actually be a Map<Transaction,Vec<OnTransactionSettled>> but that's later
+    pub trans_observers: HashMap<Transaction, Box<dyn FnOnce(Transaction)>>,
+    #[serde(skip)]
+    pub block_observers: Vec<Box<dyn FnMut(Block)>>,
     pub genesis_block: GenesisBlock,
     pub blocks: Vec<Block>,
 }
@@ -104,6 +111,8 @@ impl Blockchain {
     #[warn(dead_code)]
     pub fn new(keypair: &identity::ed25519::Keypair) -> Self {
         Self {
+            trans_observers: Default::default(),
+            block_observers: vec![],
             genesis_block: GenesisBlock::new(keypair),
             blocks: vec![],
         }
