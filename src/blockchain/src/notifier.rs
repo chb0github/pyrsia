@@ -10,17 +10,15 @@ pub struct BlockchainError;
 // But we require certain bounds to get things done...
 impl Blockchain {
     // should we borrow or own this transaction?
-    pub fn submit_transaction<CB: 'static + FnOnce(Transaction) + FnOnce(Transaction)>(
+    pub fn submit_transaction<CallBack: 'static + FnOnce(Transaction)>(
         &mut self,
         trans: Transaction,
-        on_done: CB,
+        on_done: CallBack,
     ) -> &mut Self {
         self.trans_observers.insert(trans, Box::new(on_done));
         self
     }
-    // block_chain.add_block_listener(|block| {
-    // save to db
-    //})
+
     pub fn notify_transaction_settled(&mut self, trans: Transaction) {
         // if there were no observers, we don't care
         if let Some(on_settled) = self.trans_observers.remove(&trans) {
@@ -28,9 +26,9 @@ impl Blockchain {
         }
     }
 
-    pub fn add_block_listener<CB: 'static + FnMut(Block) + FnMut(Block)>(
+    pub fn add_block_listener<CallBack: 'static + FnMut(Block)>(
         &mut self,
-        on_block: CB,
+        on_block: CallBack,
     ) -> &mut Self {
         self.block_observers.push(Box::new(on_block));
         self
@@ -74,8 +72,8 @@ mod test {
     use rand::Rng;
 
     use crate::block::*;
-    use crate::blockchain::Blockchain;
     use crate::blockchain::generate_ed25519;
+    use crate::blockchain::Blockchain;
     use crate::header::{hash, Header, PartialHeader};
 
     #[test]
@@ -104,7 +102,7 @@ mod test {
                 let called = called.clone();
                 let transaction = transaction.clone();
                 move |t: Transaction| {
-                    assert_eq!(transaction,t);
+                    assert_eq!(transaction, t);
                     called.set(true)
                 }
             })
@@ -143,7 +141,7 @@ mod test {
                 let called = called.clone();
                 let block = block.clone();
                 move |b: Block| {
-                    assert_eq!(block,b);
+                    assert_eq!(block, b);
                     called.set(true);
                 }
             })
