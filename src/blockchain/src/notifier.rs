@@ -74,8 +74,8 @@ mod test {
     use rand::Rng;
 
     use crate::block::*;
-    use crate::blockchain::generate_ed25519;
     use crate::blockchain::Blockchain;
+    use crate::blockchain::generate_ed25519;
     use crate::header::{hash, Header, PartialHeader};
 
     #[test]
@@ -102,7 +102,11 @@ mod test {
         chain
             .submit_transaction(transaction.clone(), {
                 let called = called.clone();
-                move |_: Transaction| called.set(true)
+                let transaction = transaction.clone();
+                move |t: Transaction| {
+                    assert_eq!(transaction,t);
+                    called.set(true)
+                }
             })
             .notify_transaction_settled(transaction);
         assert!(called.get());
@@ -137,7 +141,9 @@ mod test {
         chain
             .add_block_listener({
                 let called = called.clone();
-                move |_: Block| {
+                let block = block.clone();
+                move |b: Block| {
+                    assert_eq!(block,b);
                     called.set(true);
                 }
             })
