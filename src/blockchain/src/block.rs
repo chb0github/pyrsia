@@ -13,15 +13,16 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-use std::fmt::{Debug, Display, Formatter};
-use std::hash::{Hash, Hasher};
-use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::Error;
 use libp2p::identity;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
+use std::time::{SystemTime, UNIX_EPOCH};
+use rand::Rng;
 
+use super::crypto::hash_algorithm::HashDigest;
 use super::header::*;
+use super::signature::Signature;
 
 // TransactionType define the type of transaction, currently only create
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq, Copy)]
@@ -29,38 +30,6 @@ pub enum TransactionType {
     Create,
     AddAuthority,
     RevokeAuthority,
-}
-
-// struct Signature define a general structure of signature
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct Signature {
-    signature: ed25519_dalek::Signature,
-}
-
-impl Display for Signature {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let json = serde_json::to_string_pretty(&self).expect("json format error");
-        write!(f, "{}", json)
-    }
-}
-
-impl Hash for Signature {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.signature.to_bytes().hash(state);
-    }
-}
-
-impl Signature {
-    pub fn from_bytes(msg: &[u8]) -> Result<Self, Error> {
-        let sig = ed25519_dalek::Signature::from_bytes(msg)?;
-        Ok(Self { signature: sig })
-    }
-    pub fn to_bytes(self) -> [u8; ed25519_dalek::Signature::BYTE_SIZE] {
-        self.signature.to_bytes()
-    }
-    pub fn new(msg: &[u8], keypair: &identity::ed25519::Keypair) -> Self {
-        Signature::from_bytes(&keypair.sign(msg)).unwrap()
-    }
 }
 
 // ToDo
@@ -116,7 +85,7 @@ pub struct Transaction {
     pub submitter: Address,
     pub timestamp: u64,
     pub payload: Vec<u8>,
-    pub nonce: u128,
+    nonce: u128, // Adds a salt to harden
     pub transaction_hash: HashDigest,
     pub signature: TransactionSignature,
 }
@@ -126,7 +95,7 @@ impl Transaction {
         partial_transaction: PartialTransaction,
         ed25519_keypair: &identity::ed25519::Keypair,
     ) -> Self {
-        let hash = hash(&(bincode::serialize(&partial_transaction).unwrap()));
+        let hash = HashDigest::new(&(bincode::serialize(&partial_transaction).unwrap()));
         Self {
             trans_type: partial_transaction.trans_type,
             submitter: partial_transaction.submitter,
@@ -146,16 +115,11 @@ pub struct PartialTransaction {
     pub submitter: Address,
     pub timestamp: u64,
     pub payload: Vec<u8>,
-    pub nonce: u128,
+    nonce: u128,
 }
 
 impl PartialTransaction {
-    pub fn new(
-        trans_type: TransactionType,
-        submitter: Address,
-        payload: Vec<u8>,
-        nonce: u128,
-    ) -> Self {
+    pub fn new(trans_type: TransactionType, submitter: Address, payload: Vec<u8>) -> Self {
         Self {
             trans_type,
             submitter,
@@ -164,7 +128,7 @@ impl PartialTransaction {
                 .unwrap()
                 .as_secs(),
             payload,
-            nonce,
+            nonce: rand::thread_rng().gen::<u128>(),
         }
     }
 }
@@ -178,33 +142,25 @@ impl Display for Block {
 
 #[cfg(test)]
 mod tests {
-    use rand::Rng;
-
     use super::*;
 
     #[test]
     fn test_build_block() -> Result<(), String> {
         let keypair = identity::ed25519::Keypair::generate();
-        let local_id = hash(&get_publickey_from_keypair(&keypair).encode());
+        let local_id = HashDigest::new(&get_publickey_from_keypair(&keypair).encode());
 
         let mut transactions = vec![];
         let data = "Hello First Transaction";
         let transaction = Transaction::new(
-            PartialTransaction::new(
-                TransactionType::Create,
-                local_id,
-                data.as_bytes().to_vec(),
-                rand::thread_rng().gen::<u128>(),
-            ),
+            PartialTransaction::new(TransactionType::Create, local_id, data.as_bytes().to_vec()),
             &keypair,
         );
         transactions.push(transaction);
         let block_header = Header::new(PartialHeader::new(
-            hash(b""),
+            HashDigest::new(b""),
             local_id,
-            hash(b""),
+            HashDigest::new(b""),
             1,
-            rand::thread_rng().gen::<u128>(),
         ));
         let block = Block::new(block_header, transactions.to_vec(), &keypair);
 

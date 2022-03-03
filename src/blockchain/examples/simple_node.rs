@@ -26,28 +26,21 @@ use libp2p::{
     floodsub::{self, Floodsub},
     identity,
     mdns::Mdns,
-    mplex,
-    noise,
+    mplex, noise,
     swarm::{SwarmBuilder, SwarmEvent},
     tcp::TokioTcpConfig,
-    Multiaddr,
-    // `TokioTcpConfig` is available through the `tcp-tokio` feature.
-    PeerId,
-    Transport,
+    Multiaddr, PeerId, Transport,
 };
-use rand::Rng;
+use std::error::Error;
 use tokio::io::{self, AsyncBufReadExt};
 
-use pyrsia_blockchain_network::blockchain::Blockchain;
+use pyrsia_blockchain_network::crypto::hash_algorithm::HashDigest;
 use pyrsia_blockchain_network::*;
 
 pub const BLOCK_FILE_PATH: &str = "./blockchain_storage";
-// this should be cli or use a temp store
-pub const CONTINUE_COMMIT: &str = "1";
-//allow to continuously commit
-pub const APART_ONE_COMMIT: &str = "2"; //must be at least one ledger apart to commit
+pub const CONTINUE_COMMIT: &str = "1"; // Allow to continuously commit
+pub const APART_ONE_COMMIT: &str = "2"; // Must be at least one ledger apart to commit
 
-/// The `tokio::main` attribute sets up a tokio runtime.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // Create a random PeerId
@@ -125,8 +118,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Listen on all interfaces and whatever port the OS assigns
     swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
 
+    let ed25519_keypair = match id_keys {
+        identity::Keypair::Ed25519(v) => v,
+        identity::Keypair::Rsa(_) => todo!(),
+        identity::Keypair::Secp256k1(_) => todo!(),
+    };
+
     let mut transactions = vec![];
 
+
+    let local_id = HashDigest::new(&block::get_publickey_from_keypair(&ed25519_keypair).encode());
     let local_id = header::hash(&block::get_publickey_from_keypair(&ed25519_keypair).encode());
     // Kick it off
     loop {
@@ -138,7 +139,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         block::TransactionType::Create,
                         local_id,
                         line.as_bytes().to_vec(),
-                        rand::thread_rng().gen::<u128>(),
                     ),
                     &ed25519_keypair,
                 );
@@ -152,9 +152,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 blockchain.submit_transaction(transaction.clone(),move |t: Transaction| {
                     writeln!("transaction {} submitted",t)
                 });
-
                 swarm.behaviour_mut().floodsub.publish(floodsub_topic.clone(), bincode::serialize(&block).unwrap());
-                storage::write_block(filepath.clone(), block);
+                write_block(&filepath, block);
             }
             event = swarm.select_next_some() => {
                 if let SwarmEvent::NewListenAddr { address, .. } = event {
@@ -165,8 +164,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 }
 
-//Write a block to the file
-pub fn write_block(path: String, block: block::Block) {
+pub fn write_block(path: &str, block: block::Block) {
     use std::fs::OpenOptions;
     use std::io::Write;
 
