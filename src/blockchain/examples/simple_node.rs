@@ -33,7 +33,9 @@ use libp2p::{
 };
 use tokio::io::{self, AsyncBufReadExt};
 
-use pyrsia_blockchain_network::block::{Transaction,Block};
+use pyrsia_blockchain_network::network::Behaviour;
+
+use pyrsia_blockchain_network::block::{Block, PartialTransaction, Transaction, TransactionType, get_publickey_from_keypair};
 use pyrsia_blockchain_network::blockchain::Blockchain;
 use pyrsia_blockchain_network::blockchain::generate_ed25519;
 use pyrsia_blockchain_network::crypto::hash_algorithm::HashDigest;
@@ -47,24 +49,26 @@ pub const APART_ONE_COMMIT: &str = "2"; // Must be at least one ledger apart to 
 async fn main() -> Result<(), Box<dyn Error>> {
     // Create a random PeerId
     let id_keys = generate_ed25519();
-    let ed25519_keypair = match id_keys {
-        identity::Keypair::Ed25519(v) => v,
-        identity::Keypair::Rsa(_) => todo!(),
-        identity::Keypair::Secp256k1(_) => todo!(),
-    };
-    let mut chain = Blockchain::new(&ed25519_keypair);
-
     let peer_id = PeerId::from(id_keys.public());
+
     println!("Local peer id: {:?}", peer_id);
     let filepath = match std::env::args().nth(1) {
         Some(v) => v,
-        None => String::from(storage::BLOCK_FILE_PATH),
+        None => String::from(BLOCK_FILE_PATH),
     };
 
     // Create a keypair for authenticated encryption of the transport.
     let noise_keys = noise::Keypair::<noise::X25519Spec>::new()
         .into_authentic(&id_keys)
         .expect("Signing libp2p-noise static DH keypair failed.");
+
+    let ed25519_keypair = match id_keys {
+        identity::Keypair::Ed25519(v) => v,
+        identity::Keypair::Rsa(_) => todo!(),
+        identity::Keypair::Secp256k1(_) => todo!(),
+    };
+
+    let mut chain = Blockchain::new(&ed25519_keypair);
 
     // Create a tokio-based TCP transport use noise for authenticated
     // encryption and Mplex for multiplexing of substreams on a TCP stream.
@@ -86,7 +90,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Create a Swarm to manage peers and events.
     let mut swarm = {
         let mdns = Mdns::new(Default::default()).await?;
-        let mut behaviour = network::Behaviour {
+        let mut behaviour = Behaviour {
             floodsub: Floodsub::new(peer_id),
             mdns,
         };
@@ -120,41 +124,36 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Listen on all interfaces and whatever port the OS assigns
     swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
 
-    let ed25519_keypair = match id_keys {
-        identity::Keypair::Ed25519(v) => v,
-        identity::Keypair::Rsa(_) => todo!(),
-        identity::Keypair::Secp256k1(_) => todo!(),
-    };
 
-    let mut transactions = vec![];
 
-    let local_id = HashDigest::new(&block::get_publickey_from_keypair(&ed25519_keypair).encode());
+    let local_id = HashDigest::new(&get_publickey_from_keypair(&ed25519_keypair).encode());
     // Kick it off
     loop {
         tokio::select! {
             line = stdin.next_line() => {
                 let line = line?.expect("stdin closed");
-                let transaction = block::Transaction::new(
-                    block::PartialTransaction::new(
-                        block::TransactionType::Create,
+                let transaction = Transaction::new(
+                    PartialTransaction::new(
+                        TransactionType::Create,
                         local_id,
                         line.as_bytes().to_vec(),
                     ),
                     &ed25519_keypair,
                 );
-                blockchain.add_block_listener(move |b: Block| {
+                chain.add_block_listener(move |b: Block| {
                     println!("---------");
                     println!("---------");
                     println!("Add a New Block : {:?}", b);
-                    write_block(&filepath,b);
-                }).add_block_listener(move |b: Block| {
+                    // must put this in a mux
+                    // write_block(&filepath.clone(),b);
+                }).add_block_listener(move |_b: Block| {
                     // TODO
                     // swarm.behaviour_mut().floodsub.publish(floodsub_topic.clone(), bincode::serialize(&block).unwrap());
                 });
 
                 // eventually this will trigger a block action
-                blockchain.submit_transaction(transaction.clone(),move |t: Transaction| {
-                    writeln!("transaction {:?} submitted",t)
+                chain.submit_transaction(transaction.clone(),move |t: Transaction| {
+                    println!("transaction {:?} submitted",t)
                 });
             }
             event = swarm.select_next_some() => {
@@ -166,7 +165,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 }
 
-pub fn write_block(path: &str, block: block::Block) {
+pub fn write_block(path: &str, block: Block) {
     use std::fs::OpenOptions;
     use std::io::Write;
 
