@@ -85,8 +85,6 @@ impl Debug for Blockchain {
     }
 }
 
-
-
 impl Blockchain {
     pub fn new(keypair: &identity::ed25519::Keypair) -> Self {
         let local_id = HashDigest::new(&get_publickey_from_keypair(&keypair).encode());
@@ -99,13 +97,13 @@ impl Blockchain {
                     HashDigest::new(b""),
                     local_id,
                     HashDigest::new(b""),
-                    1
+                    1,
                 )),
                 Vec::from([Transaction::new(
                     PartialTransaction::new(
                         TransactionType::AddAuthority,
                         local_id,
-                        "this needs to be the root authority".as_bytes().to_vec()
+                        "this needs to be the root authority".as_bytes().to_vec(),
                     ),
                     &keypair,
                 )]),

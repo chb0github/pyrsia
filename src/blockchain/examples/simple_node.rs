@@ -126,7 +126,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let mut transactions = vec![];
 
-
     let local_id = HashDigest::new(&block::get_publickey_from_keypair(&ed25519_keypair).encode());
     let local_id = header::hash(&block::get_publickey_from_keypair(&ed25519_keypair).encode());
     // Kick it off
