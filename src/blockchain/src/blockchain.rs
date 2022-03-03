@@ -240,7 +240,7 @@ mod tests {
             PartialTransaction::new(
                 TransactionType::Create,
                 local_id,
-                "some transaction".as_bytes().to_vec()
+                "some transaction".as_bytes().to_vec(),
             ),
             &ed25519_keypair,
         );
@@ -272,7 +272,7 @@ mod tests {
             HashDigest::new(b""),
             local_id,
             HashDigest::new(b""),
-            1
+            1,
         ));
 
         let block = Block::new(
@@ -293,7 +293,6 @@ mod tests {
                 }
             })
             .add_block(block);
-        println!("{}", chain);
         assert!(called.get()); // called is still false
         Ok(())
     }
