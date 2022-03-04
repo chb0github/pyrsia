@@ -144,7 +144,7 @@ async fn main() {
                     println!("Add a New Block : {:?}", b);
                     // TODO(chb0github): Should be wrapped in mutex
                     // write_block(&filepath.clone(), b);
-                })
+                });
 
                 // eventually this will trigger a block action
                 chain.submit_transaction(transaction.clone(),move |t: Transaction| {
