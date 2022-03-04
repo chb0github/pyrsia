@@ -18,7 +18,6 @@ extern crate pretty_env_logger;
 extern crate pyrsia_blockchain_network;
 extern crate tokio;
 
-use std::error::Error;
 
 use futures::StreamExt;
 use libp2p::{
@@ -48,7 +47,7 @@ pub const CONTINUE_COMMIT: &str = "1";
 pub const APART_ONE_COMMIT: &str = "2"; // Must be at least one ledger apart to commit
 
 #[tokio::main]
-async fn main()  {
+async fn main() {
     // Create a random PeerId
     let id_keys = generate_ed25519();
     let peer_id = PeerId::from(id_keys.public());
