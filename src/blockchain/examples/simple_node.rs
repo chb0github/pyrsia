@@ -142,12 +142,9 @@ async fn main() {
                     println!("---------");
                     println!("---------");
                     println!("Add a New Block : {:?}", b);
-                    // must put this in a mux
-                    // write_block(&filepath.clone(),b);
-                }).add_block_listener(move |_b: Block| {
-                    // TODO
-                    // swarm.behaviour_mut().floodsub.publish(floodsub_topic.clone(), bincode::serialize(&block).unwrap());
-                });
+                    // TODO(chb0github): Should be wrapped in mutex
+                    // write_block(&filepath.clone(), b);
+                })
 
                 // eventually this will trigger a block action
                 chain.submit_transaction(transaction.clone(),move |t: Transaction| {
