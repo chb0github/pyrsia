@@ -26,18 +26,20 @@ use libp2p::{
     floodsub::{self, Floodsub},
     identity,
     mdns::Mdns,
-    mplex, Multiaddr,
-    noise,
-    PeerId,
-    swarm::{SwarmBuilder, SwarmEvent}, tcp::TokioTcpConfig, Transport,
+    mplex, noise,
+    swarm::{SwarmBuilder, SwarmEvent},
+    tcp::TokioTcpConfig,
+    Multiaddr, PeerId, Transport,
 };
 use tokio::io::{self, AsyncBufReadExt};
 
 use pyrsia_blockchain_network::network::Behaviour;
 
-use pyrsia_blockchain_network::block::{Block, PartialTransaction, Transaction, TransactionType, get_publickey_from_keypair};
-use pyrsia_blockchain_network::blockchain::Blockchain;
+use pyrsia_blockchain_network::block::{
+    get_publickey_from_keypair, Block, PartialTransaction, Transaction, TransactionType,
+};
 use pyrsia_blockchain_network::blockchain::generate_ed25519;
+use pyrsia_blockchain_network::blockchain::Blockchain;
 use pyrsia_blockchain_network::crypto::hash_algorithm::HashDigest;
 
 pub const BLOCK_FILE_PATH: &str = "./blockchain_storage";
@@ -46,7 +48,7 @@ pub const CONTINUE_COMMIT: &str = "1";
 pub const APART_ONE_COMMIT: &str = "2"; // Must be at least one ledger apart to commit
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main()  {
     // Create a random PeerId
     let id_keys = generate_ed25519();
     let peer_id = PeerId::from(id_keys.public());
@@ -103,7 +105,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .executor(Box::new(|fut| {
                 tokio::spawn(fut);
             }))
-            .build()
+            .build();
     };
 
     // Reach out to another node if specified
@@ -115,7 +117,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if let Some(to_dial) = std::env::args().nth(3) {
         let addr: Multiaddr = to_dial.parse()?;
         swarm.dial(addr)?;
-        println!("Dialed {:?}", to_dial)
+        println!("Dialed {:?}", to_dial);
     }
 
     // Read full lines from stdin
@@ -123,8 +125,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Listen on all interfaces and whatever port the OS assigns
     swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
-
-
 
     let local_id = HashDigest::new(&get_publickey_from_keypair(&ed25519_keypair).encode());
     // Kick it off
@@ -153,7 +153,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                 // eventually this will trigger a block action
                 chain.submit_transaction(transaction.clone(),move |t: Transaction| {
-                    println!("transaction {:?} submitted",t)
+                    println!("transaction {:?} submitted",t);
                 });
             }
             event = swarm.select_next_some() => {
