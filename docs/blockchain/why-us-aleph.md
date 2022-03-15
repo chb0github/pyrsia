@@ -17,7 +17,8 @@ have any number of faults in the system?
 ## Core Requirements
 - No currency. We wish to avoid legal problems
 - Short TTF
-- Apache 2 or compatible license
+- Apache 2 or compatible license (To avoid legal problems)
+- Active community development (necessary for good support)
 
 Given the complexity of consensus and the data structures used to manage a blockchain, it's advisable to find existing
 code that can be leveraged; stand on the shoulders of giants, as the expression goes. However, this led us into a
