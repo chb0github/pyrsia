@@ -50,9 +50,7 @@ In addition, a core part of their platform is _not_ license compatible.
 
 # Unresolved questions
 
-There are 2 outstanding questions:
-1. What sort of key or certificate should we use to sign things? X509, which is hierarchical or simple public/private key which are quicker and easier to deploy
-2. Should metadata be cooked right into the block and transactions themselves or should metadata be an opaque part of the payload?
+None.
 
 # Future possibilities
 
