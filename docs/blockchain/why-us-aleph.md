@@ -14,7 +14,7 @@ blockchain are plenty challenging but nothing mind bending. However, the real ch
 how do you get a bunch of strangers to trust each other and agree, when some of them might be corrupt and you could
 have any number of faults in the system?
 
-# Our core requirements #
+## Core Requirements
 - No currency. We wish to avoid legal problems
 - Short TTF
 - Apache 2 or compatible license
