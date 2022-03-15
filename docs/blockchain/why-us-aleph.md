@@ -41,7 +41,7 @@ Finally, it's block uses very well tread data structures, that have been proven 
 Another such tech [substrate](https://substrate.io/) did much more, and had a compatible license, but had the
 assumption of a currency. We had considered setting transaction costs and gas to 0 (thus neutralising block currency), but even this was deemed too much.
 
-## Tendermint ##
+## Tendermint
 The last tech truly considered was [tendermint](https://tendermint.com/). However, their examples wouldn't compile and
 when reaching out to community, after taking extreme measures to get it working, the response was ["We don't have the
 bandwidth to maintain docs in as many languages set of docs so we're planning on removing them"](https://github.com/tendermint/tendermint/issues/7743#issuecomment-1028025629).
