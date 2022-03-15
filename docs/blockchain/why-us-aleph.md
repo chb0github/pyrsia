@@ -37,7 +37,7 @@ Also, the implementation was simple as only basic traits needed to be implemente
 In addition, because `verify` and `sign` as so cleanly isolated, we are able to use proof of authority. Which is simple and gives enterprise IT admins warm fuzzy feelings.
 Finally, it's block uses very well tread data structures, that have been proven repeatedly.
 
-## Substrate ##
+## Substrate
 Another such tech [substrate](https://substrate.io/) did much more, and had a compatible license, but had the
 assumption of a currency. We had considered setting transaction costs and gas to 0 (thus neutralising block currency), but even this was deemed too much.
 
