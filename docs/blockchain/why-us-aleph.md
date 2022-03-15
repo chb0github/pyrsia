@@ -27,7 +27,7 @@ this is the biggest reason people have gravitated toward blockchain: Bitcoin and
 
 # Prior art
 
-## Aleph ##
+## Aleph
 
 There was only 1 library out there that exclusively did consensus and nothing else: [Aleph](https://github.com/aleph-zero-foundation/AlephBFT).
 Also, the implementation was simple as only basic traits needed to be implemented
