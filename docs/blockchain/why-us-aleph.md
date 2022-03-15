@@ -16,7 +16,7 @@ have any number of faults in the system?
 
 # Our core requirements #
 - No currency. We wish to avoid legal problems
-- High TPS and TTF
+- Short TTF
 - Apache 2 or compatible license
 
 Given the complexity of consensus and the data structures used to manage a blockchain, it's advisable to find existing
