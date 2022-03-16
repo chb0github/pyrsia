@@ -5,7 +5,7 @@
 
 # Summary
 
-Why we chose to use Aleph for our consensus engine
+Exploration, reasoning and choice for a consensus engine to build on top of
 
 # Motivation
 
