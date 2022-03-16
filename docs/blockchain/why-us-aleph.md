@@ -30,10 +30,13 @@ this is the biggest reason people have gravitated toward blockchain: Bitcoin and
 
 ## Aleph
 
-There was one library  in particular that stood out for focusing on consensus and nothing else: [Aleph](https://github.com/aleph-zero-foundation/AlephBFT).
-Also, the implementation was simple as only basic traits needed to be implemented
+There was one library in particular that stood out for focusing on consensus and nothing else: [Aleph](https://github.com/aleph-zero-foundation/AlephBFT).
+Also, the implementation was simple as only 3 [basic traits needed to be implemented](https://github.com/aleph-zero-foundation/AlephBFT#using-the-crate)
 1. Sign/verify
-2. I/O
+2. I/O (distinct from network IO)
+3. Network
+
+A more detailed write-up is available [here](https://docs.google.com/presentation/d/1hJIa9Ht-s99CuHGou6Ra9Y7Lkk2OIV9OjxM4wVDFcao/edit#slide=id.g1156090f3c7_1_125)
 
 In addition, because `verify` and `sign` as so cleanly isolated, we are able to use proof of authority. Which is simple and gives enterprise IT admins warm fuzzy feelings.
 Finally, it's block uses very well tread data structures, that have been proven repeatedly.
