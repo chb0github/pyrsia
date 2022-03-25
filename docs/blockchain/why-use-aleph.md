@@ -1,8 +1,3 @@
-- Feature Name: (fill me in with a unique ident, `my_awesome_feature`)
-- Start Date: (fill me in with today's date, YYYY-MM-DD)
-- RFC PR: [pyrsia/pyrsia#0000](https://github.com/pyrsia/pyrsia/pull/0000)
-- Pyrsia Issue: [pyrsia/pyrsia#0000](https://github.com/pyrsia/pyrsia/issues/0000)
-
 # Summary
 
 Exploration, reasoning and choice for a consensus engine to build on top of
@@ -10,7 +5,7 @@ Exploration, reasoning and choice for a consensus engine to build on top of
 # Motivation
 
 One of Pyrsia's main design decisions is to use a blockchain for its underlying datastore. The data structure(s) of a
-blockchain are plenty challenging but nothing mind bending. However, the real challenge to blockchain is consensus;
+blockchain are plenty challenging but nothing mind-bending. However, the real challenge to blockchain is consensus;
 how do you get a bunch of strangers to trust each other and agree, when some of them might be corrupt and you could
 have any number of faults in the system?
 
