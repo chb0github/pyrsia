@@ -29,7 +29,7 @@ Etherium manages chain merging by treating it not as a blockchain, but as a bloc
 new implementations of blockchain allow for a list of transactions in a single block. This keep the block count lower and thus
 increases overall efficiency since it's the blocks that require consensus and take time.
 
-TO that end, our blockchain contains:
+To that end, our blockchain contains:
 1. Multiple transactions per block
 2. Signed transaction hash for efficiently verifying transactions
 3. Merkle root indicator so that we can use a merkle tree implementation
