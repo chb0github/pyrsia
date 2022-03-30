@@ -15,7 +15,7 @@ what we have.
 
 # Guide-level explanation
 
-When designing our blockchain we didn't try to get clever. We tried to stand on the shoulders of giant and accepted most of the implementations
+When designing our blockchain we didn't try to get clever. We tried to stand on the shoulders of giants and accepted most of the implementations
 we found as inspired. Where possible, we tried to dig into reasons for any particular choice. But ultimately we decided that what we were seeing represented
 state-of-the-art, and we should lean towards accepting it.
 
