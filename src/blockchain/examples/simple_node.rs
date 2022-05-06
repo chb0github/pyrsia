@@ -26,6 +26,7 @@ use std::{
     os::unix::fs::OpenOptionsExt,
     sync::{Arc, Mutex},
 };
+use std::io::{BufRead, BufReader, stdin};
 use tokio::io;
 
 // use pyrsia_blockchain_network::blockchain::Blockchain;
@@ -39,6 +40,7 @@ use pyrsia_blockchain_network::structures::block::Block;
 use pyrsia_blockchain_network::{
     default_config, gen_chain_config, run_blockchain, run_session, NodeIndex,
 };
+use pyrsia_blockchain_network::blockchain::Blockchain;
 
 pub const BLOCK_FILE_PATH: &str = "./blockchain_storage";
 pub const BLOCK_KEYPAIR_FILENAME: &str = ".block_keypair";
@@ -47,122 +49,27 @@ const TXS_PER_BLOCK: usize = 50000;
 const TX_SIZE: usize = 300;
 const BLOCK_TIME_MS: u128 = 500;
 const INITIAL_DELAY_MS: u128 = 5000;
+// NodeIndex(int) -> KP
+
+// Need an initial block - Genesis block
+// hard code map of authorities
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // If the key file exists, load the key pair. Otherwise, create a random keypair and save to the key file
-    let id_keys = create_ed25519_keypair();
-    let ed25519_pair = identity::Keypair::Ed25519(id_keys.clone());
-    let _peer_id = PeerId::from(ed25519_pair.public());
+    // let id_keys = create_ed25519_keypair();
+    let keypair = identity::ed25519::Keypair::generate();
 
-    info!("Getting network up.");
-    let n_members = 3;
-    let my_node_ix = NodeIndex(0); // TODO(prince-chrismc): Should be a CLI arg?
+//keypair: &identity::ed25519::Keypair
+    let mut bc = Blockchain::new(&keypair);
+    BufReader::new(stdin()).lines()
+        .map(|l| l.unwrap())
+        .for_each(|l| {
+            bc.submit_transaction(l.as_bytes().to_vec(), |t| {
+                println!("transaction  accepted");
+            });
+        });
 
-    let pen = AuthorityPen::new(my_node_ix, id_keys.clone());
-    let verifier = AuthorityVerifier::new();
-
-    let keybox = KeyBox::new(pen, verifier);
-
-    let (authority_to_verifier, mut authority_from_network) = futures_mpsc::unbounded();
-    let (close_verifier, mut exit) = oneshot::channel();
-    tokio::spawn(async move {
-        loop {
-            futures::select! {
-                maybe_auth = authority_from_network.next() => {
-                    if let Some((_node_ix, _public_key)) = maybe_auth {
-                        // record_authority(node_ix, public_key);
-                    }
-                }
-               _ = &mut exit  => break,
-            }
-        }
-    });
-
-    let (
-        network,
-        mut manager,
-        block_from_data_io_tx,
-        block_from_network_rx,
-        message_for_network,
-        message_from_network,
-    ) = Network::new(
-        my_node_ix,
-        id_keys.clone(),
-        Default::default(), // peers_by_index,
-        authority_to_verifier,
-    )
-    .await
-    .expect("Libp2p network set-up should succeed.");
-    // Make the "genesis" blocks
-    let current_block: Arc<Mutex<Block>> = Arc::new(Mutex::new(Block::new(
-        HashDigest::new(b""),
-        0,
-        vec![],
-        &id_keys,
-    )));
-
-    let data_provider = DataProvider::new(current_block.clone()); // TODO(prince-chrismc): Blend this into blockchain API???
-    let (finalization_provider, mut finalized_rx) = FinalizationProvider::new();
-    let data_store = DataStore::new(current_block.clone(), message_for_network);
-
-    let (close_network, exit) = oneshot::channel();
-    tokio::spawn(async move { manager.run(exit).await });
-
-    let data_size: usize = TXS_PER_BLOCK * TX_SIZE;
-    let chain_config = gen_chain_config(
-        my_node_ix,
-        n_members,
-        data_size,
-        BLOCK_TIME_MS,
-        INITIAL_DELAY_MS,
-    );
-    let (close_chain, exit) = oneshot::channel();
-    tokio::spawn(async move {
-        run_blockchain(
-            chain_config,
-            data_store,
-            current_block,
-            block_from_network_rx,
-            block_from_data_io_tx,
-            message_from_network,
-            exit,
-        )
-        .await
-    });
-
-    let (close_member, exit) = oneshot::channel();
-    tokio::spawn(async move {
-        let config = default_config(n_members.into(), my_node_ix, 0);
-        run_session(
-            config,
-            network,
-            data_provider,
-            finalization_provider,
-            keybox,
-            Spawner {},
-            exit,
-        )
-        .await
-    });
-
-    let mut max_block_finalized = 0;
-    while let Some(block_num) = finalized_rx.next().await {
-        if max_block_finalized < block_num.header.ordinal {
-            max_block_finalized = block_num.header.ordinal;
-        }
-        debug!(
-            "🌟 Got new batch. Highest finalized = {:?}",
-            max_block_finalized
-        );
-        if max_block_finalized >= 100 as u128 {
-            break;
-        }
-    }
-    close_member.send(()).expect("should send");
-    close_chain.send(()).expect("should send");
-    close_network.send(()).expect("should send");
-    close_verifier.send(()).expect("should send");
     Ok(())
 }
 
