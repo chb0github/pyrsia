@@ -80,7 +80,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     info!("Getting network up!");
     let n_members = 3;
     let my_node_ix = NodeIndex(0); // TODO(prince-chrismc): Should be a CLI arg?
->>>>>>> upstream/main
 
     Ok(())
 }
