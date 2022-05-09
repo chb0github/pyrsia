@@ -13,11 +13,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-use std::io::*;
 use libp2p::identity;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{self, Debug, Formatter};
+use std::io::*;
 
 use super::crypto::hash_algorithm::HashDigest;
 use super::structures::{
@@ -66,9 +66,7 @@ impl Blockchain {
             keypair,
         );
         // Make the "genesis" blocks
-        let block = Block::new(
-            HashDigest::new(b""), 0, Vec::from([transaction]), keypair,
-        );
+        let block = Block::new(HashDigest::new(b""), 0, Vec::from([transaction]), keypair);
         let mut chain: Chain = Default::default();
         chain.blocks.push(block);
 
@@ -90,12 +88,7 @@ impl Blockchain {
         on_done: CallBack,
     ) -> &mut Self {
         let submitter = Address::from(identity::PublicKey::Ed25519(self.keypair.public()));
-        let trans = Transaction::new(
-            TransactionType::Create,
-            submitter,
-            payload,
-            &self.keypair,
-        );
+        let trans = Transaction::new(TransactionType::Create, submitter, payload, &self.keypair);
         self.trans_observers.insert(trans, Box::new(on_done));
         self
     }
@@ -120,21 +113,19 @@ impl Blockchain {
             .iter_mut()
             .for_each(|notify| notify(block.clone()));
 
-        block.transactions.into_iter().for_each(|trans: Transaction| {
-            self.notify_transaction_settled(trans)
-        });
+        block
+            .transactions
+            .into_iter()
+            .for_each(|trans: Transaction| self.notify_transaction_settled(trans));
         self
     }
 
     #[warn(dead_code)]
     pub fn add_block(&mut self, block: Block) {
         self.chain.blocks.push(block);
-        self.notify_block_event(
-            self.chain.blocks.last().expect("block must exist").clone()
-        );
+        self.notify_block_event(self.chain.blocks.last().expect("block must exist").clone());
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -221,7 +212,7 @@ mod tests {
     // }
 
     #[test]
-    fn test_make_genesis_block()  {
+    fn test_make_genesis_block() {
         let keypair = read_keypair(&String::from("/some/path"));
         let local_id = Address::from(identity::PublicKey::Ed25519(keypair.public()));
         let transaction = Transaction::new(
@@ -249,4 +240,3 @@ mod tests {
         identity::ed25519::Keypair::decode(&mut buf).unwrap()
     }
 }
-

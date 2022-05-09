@@ -20,6 +20,7 @@ use futures::channel::{mpsc as futures_mpsc, oneshot};
 use futures::StreamExt;
 use libp2p::{identity, PeerId};
 use log::{debug, info};
+use std::io::{stdin, BufRead, BufReader};
 use std::{
     error::Error,
     fs,
@@ -27,11 +28,11 @@ use std::{
     os::unix::fs::OpenOptionsExt,
     sync::{Arc, Mutex},
 };
-use std::io::{BufRead, BufReader, stdin};
 use tokio::io;
 
 // use pyrsia_blockchain_network::blockchain::Blockchain;
 use pyrsia_blockchain_network::args::parser::BlockchainNodeArgs;
+use pyrsia_blockchain_network::blockchain::Blockchain;
 use pyrsia_blockchain_network::crypto::hash_algorithm::HashDigest;
 use pyrsia_blockchain_network::identities::{
     authority_pen::AuthorityPen, authority_verifier::AuthorityVerifier, key_box::KeyBox,
@@ -42,7 +43,6 @@ use pyrsia_blockchain_network::structures::block::Block;
 use pyrsia_blockchain_network::{
     default_config, gen_chain_config, run_blockchain, run_session, NodeIndex,
 };
-use pyrsia_blockchain_network::blockchain::Blockchain;
 
 const TXS_PER_BLOCK: usize = 50000;
 const TX_SIZE: usize = 300;
@@ -59,9 +59,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // let id_keys = create_ed25519_keypair();
     let keypair = identity::ed25519::Keypair::generate();
 
-//keypair: &identity::ed25519::Keypair
+    //keypair: &identity::ed25519::Keypair
     let mut bc = Blockchain::new(&keypair);
-    BufReader::new(stdin()).lines()
+    BufReader::new(stdin())
+        .lines()
         .map(|l| l.unwrap())
         .for_each(|l| {
             bc.submit_transaction(l.as_bytes().to_vec(), |t| {
