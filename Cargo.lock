@@ -690,9 +690,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.1.15"
+version = "3.1.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85a35a599b11c089a7f49105658d089b8f2cf0882993c17daf6de15285c2c35d"
+checksum = "47582c09be7c8b32c0ab3a6181825ababb713fde6fff20fc573a3870dd45c6a0"
 dependencies = [
  "atty",
  "bitflags",
@@ -2898,9 +2898,9 @@ dependencies = [
 
 [[package]]
 name = "num-traits"
-version = "0.2.14"
+version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
+checksum = "578ede34cf02f8924ab9447f50c28075b4d3e5b269972345e7e0372b38c6cdcd"
 dependencies = [
  "autocfg",
 ]
@@ -3407,7 +3407,7 @@ dependencies = [
  "blake3",
  "byte-unit",
  "bytes",
- "clap 3.1.15",
+ "clap 3.1.17",
  "confy",
  "ctor",
  "defaults",
@@ -3465,7 +3465,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
- "clap 3.1.15",
+ "clap 3.1.17",
  "dirs",
  "ed25519-dalek",
  "futures",
@@ -3491,7 +3491,7 @@ version = "0.1.1"
 dependencies = [
  "anyhow",
  "assay",
- "clap 3.1.15",
+ "clap 3.1.17",
  "confy",
  "const_format",
  "futures",
@@ -3508,7 +3508,7 @@ name = "pyrsia_node"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 3.1.15",
+ "clap 3.1.17",
  "futures",
  "hex",
  "libp2p",
