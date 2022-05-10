@@ -17,6 +17,7 @@ use libp2p::identity;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{self, Debug, Formatter};
+use std::fs;
 use std::io::*;
 
 use super::crypto::hash_algorithm::HashDigest;
@@ -212,6 +213,24 @@ mod tests {
     // }
 
     #[test]
+    fn test_write_json() {
+        // TODO: Write a real test
+        let value = ::serde_json::json!({
+            "name": "John Doe",
+            "age": 43,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        });
+        let file_path = String::from("test.json");
+        match write_json(&file_path, &value) {
+            Ok(_) => println!("success"),
+            Err(e) => println!("{}", e)
+        }
+    }
+
+    #[test]
     fn test_make_genesis_block() {
         let keypair = read_keypair(&String::from("/some/path"));
         let local_id = Address::from(identity::PublicKey::Ed25519(keypair.public()));
@@ -238,5 +257,16 @@ mod tests {
             panic!("bad keypair");
         }
         identity::ed25519::Keypair::decode(&mut buf).unwrap()
+    }
+
+    pub fn write_json(path: &String, obj: &serde_json::Value) -> Result<()> {
+        Ok(::serde_json::to_writer(&std::fs::File::create(path)?, obj)?)
+    }
+
+    pub fn read_json(path: &String) -> serde_json::Value {
+        let mut file = std::fs::File::open(path).unwrap();
+        let mut data = String::new();
+        file.read_to_string(&mut data).unwrap();
+        serde_json::from_str(data.as_str()).expect("JSON was not well-formatted")
     }
 }
