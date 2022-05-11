@@ -3503,6 +3503,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "clap 3.1.17",
+ "data-encoding",
  "dirs",
  "ed25519-dalek",
  "futures",

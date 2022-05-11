@@ -26,3 +26,11 @@ pub struct BlockchainNodeArgs {
     #[clap(long, short = 'K', default_value = DEFAULT_BLOCK_KEYPAIR_FILENAME)]
     pub key_filename: String,
 }
+
+impl BlockchainNodeArgs {
+    pub fn new() -> Self {
+        Self {
+            key_filename: DEFAULT_BLOCK_KEYPAIR_FILENAME.to_string()
+        }
+    }
+}

@@ -111,8 +111,11 @@ impl Transaction {
             .convert_to_transaction(ed25519_keypair)
             .unwrap()
     }
-    pub fn hash(&self) -> HashDigest {
+    pub fn digest(&self) -> HashDigest {
         self.hash
+    }
+    pub fn payload(&self) -> Vec<u8> {
+        self.payload.clone()
     }
     pub fn signature(&self) -> TransactionSignature {
         self.signature.clone()
@@ -139,7 +142,7 @@ mod tests {
         let expected_signature =
             Signature::new(&bincode::serialize(&expected_hash).unwrap(), &keypair);
 
-        assert_eq!(expected_hash, transaction.hash());
+        assert_eq!(expected_hash, transaction.digest());
         assert_eq!(expected_signature, transaction.signature());
     }
 }
