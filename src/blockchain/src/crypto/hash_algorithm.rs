@@ -32,6 +32,10 @@ impl HashDigest {
         }
     }
 
+    pub fn as_string(&self) -> String {
+        format!("keccak256:{}", data_encoding::HEXLOWER_PERMISSIVE.encode(&self.to_slice()))
+    }
+
     pub fn to_slice(&self) -> [u8; 32] {
         self.multihash
             .digest()
