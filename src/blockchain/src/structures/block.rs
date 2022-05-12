@@ -30,7 +30,6 @@ pub type BlockSignature = Signature;
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Decode, Encode, Hash)]
 pub struct Block {
     pub header: Header,
-    // TODO(fishseabowl): Should be a Merkle Tree to speed up validation with root hash
     pub transactions: Vec<Transaction>,
     signature: BlockSignature,
 }

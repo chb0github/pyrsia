@@ -29,3 +29,11 @@ pub struct BlockchainNodeArgs {
     #[clap(long, short = 'I', required = true)]
     pub peer_index: usize,
 }
+
+impl BlockchainNodeArgs {
+    pub fn new() -> Self {
+        Self {
+            key_filename: DEFAULT_BLOCK_KEYPAIR_FILENAME.to_string()
+        }
+    }
+}

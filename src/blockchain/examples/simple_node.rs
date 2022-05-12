@@ -14,61 +14,33 @@
    limitations under the License.
 */
 
-use clap::Parser;
-use dirs;
-use futures::channel::{mpsc as futures_mpsc, oneshot};
-use futures::StreamExt;
-use libp2p::{identity, PeerId};
-use log::{debug, info};
 use std::io::{stdin, BufRead, BufReader};
 use std::{
     error::Error,
-    fs,
-    io::{Read, Write},
-    os::unix::fs::OpenOptionsExt,
-    sync::{Arc, Mutex},
 };
-use tokio::io;
 
 // use pyrsia_blockchain_network::blockchain::Blockchain;
-use pyrsia_blockchain_network::args::parser::BlockchainNodeArgs;
-use pyrsia_blockchain_network::blockchain::Blockchain;
-use pyrsia_blockchain_network::crypto::hash_algorithm::HashDigest;
-use pyrsia_blockchain_network::identities::{
-    authority_pen::AuthorityPen, authority_verifier::AuthorityVerifier, key_box::KeyBox,
-};
-use pyrsia_blockchain_network::network::{Network, Spawner};
-use pyrsia_blockchain_network::providers::{DataProvider, DataStore, FinalizationProvider};
-use pyrsia_blockchain_network::structures::block::Block;
-use pyrsia_blockchain_network::{
-    default_config, gen_chain_config, run_blockchain, run_session, NodeIndex,
-};
+use pyrsia_blockchain_network::blockchain::{create_ed25519_keypair, Blockchain};
 
-const TXS_PER_BLOCK: usize = 50000;
-const TX_SIZE: usize = 300;
-const BLOCK_TIME_MS: u128 = 500;
-const INITIAL_DELAY_MS: u128 = 5000;
-// NodeIndex(int) -> KP
 
-// Need an initial block - Genesis block
-// hard code map of authorities
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // If the key file exists, load the key pair. Otherwise, create a random keypair and save to the key file
     // let id_keys = create_ed25519_keypair();
-    let keypair = identity::ed25519::Keypair::generate();
-
-    //keypair: &identity::ed25519::Keypair
+    // If the key file exists, load the key pair. Otherwise, create a random keypair and save to the keypair file
+    let keypair = create_ed25519_keypair("keypair");
     let mut bc = Blockchain::new(&keypair);
+
     BufReader::new(stdin())
         .lines()
         .map(|l| l.unwrap())
         .for_each(|l| {
             bc.submit_transaction(l.as_bytes().to_vec(), |t| {
-                println!("transaction  accepted");
+                println!("transaction  accepted {}", t.signature().as_string());
             });
         });
+<<<<<<< HEAD
     pretty_env_logger::init();
 
     let args = BlockchainNodeArgs::parse();

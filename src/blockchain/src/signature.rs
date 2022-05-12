@@ -36,6 +36,9 @@ impl Hash for Signature {
 }
 
 impl Signature {
+    pub fn as_string(&self) -> String {
+        format!("keccak256:{}", data_encoding::HEXLOWER_PERMISSIVE.encode(&self.signature.to_bytes()))
+    }
     pub fn from_bytes(msg: &[u8]) -> Result<Self, Error> {
         let sig = ed25519_dalek::Signature::from_bytes(msg)?;
         Ok(Self { signature: sig })
@@ -50,12 +53,12 @@ impl Signature {
 }
 
 impl Encode for Signature {
-    fn using_encoded<R, F: FnOnce(&[u8]) -> R>(&self, f: F) -> R {
-        self.signature.to_bytes().using_encoded(f)
-    }
-
     fn size_hint(&self) -> usize {
         ed25519_dalek::Signature::BYTE_SIZE
+    }
+
+    fn using_encoded<R, F: FnOnce(&[u8]) -> R>(&self, f: F) -> R {
+        self.signature.to_bytes().using_encoded(f)
     }
 }
 
