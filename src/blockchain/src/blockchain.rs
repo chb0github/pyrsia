@@ -692,10 +692,7 @@ impl Blockchain {
         };
         me.add_block_listener(
             move |b: Block| {
-                match write_block(&b) {
-                    Ok(_) => println!("Wrote block"),
-                    Err(e) => panic!("Could not write block: {}", e),
-                }
+                write_block(&b).expect("Block written to disk");
             }
         );
         me
