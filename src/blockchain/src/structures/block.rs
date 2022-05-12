@@ -16,6 +16,7 @@
 
 use codec::{Decode, Encode};
 use libp2p::identity;
+use libp2p::identity::ed25519::Keypair;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
@@ -39,7 +40,7 @@ impl Block {
         parent_hash: HashDigest,
         ordinal: u128,
         transactions: Vec<Transaction>,
-        signing_key: &identity::ed25519::Keypair,
+        signing_key: &Keypair,
     ) -> Self {
         let transaction_root = HashDigest::new(&bincode::serialize(&transactions).unwrap());
         let header = Header::new(
@@ -55,8 +56,14 @@ impl Block {
         }
     }
 
-    pub fn signature(&self) -> BlockSignature {
-        self.signature.clone()
+    pub fn id(&self) -> String {
+        self.header.hash().as_string()
+    }
+    pub fn ordinal(&self) -> u128 {
+        self.header.ordinal as u128
+    }
+    pub fn signature(&self) -> String {
+        self.signature.as_string()
     }
 
     // After merging Aleph consensus algorithm, it would be implemented
@@ -80,7 +87,6 @@ impl Display for Block {
 
 #[cfg(test)]
 mod tests {
-
     use super::super::transaction::TransactionType;
     use super::*;
 
