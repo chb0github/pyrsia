@@ -106,7 +106,7 @@ mod tests {
             Signature::new(&bincode::serialize(&block.header.hash()).unwrap(), &keypair);
 
         assert_eq!(1, block.header.ordinal);
-        assert_eq!(expected_signature, block.signature());
+        assert_eq!(expected_signature.as_string(), block.signature());
         Ok(())
     }
 }

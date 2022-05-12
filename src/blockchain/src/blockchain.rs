@@ -683,13 +683,22 @@ impl Blockchain {
         let mut chain: Chain = Default::default();
         chain.blocks.push(genesis_block);
 
-        Self {
+        let mut me = Blockchain {
             trans_observers: Default::default(),
             block_observers: vec![],
             keypair: keypair.clone(),
             submitter,
             chain,
-        }
+        };
+        me.add_block_listener(
+            move |b: Block| {
+                match write_block(&b) {
+                    Ok(_) => println!("Wrote block"),
+                    Err(e) => panic!("Could not write block: {}", e),
+                }
+            }
+        );
+        me
     }
 
     pub fn blocks(&self) -> Vec<Block> {
@@ -746,17 +755,16 @@ impl Blockchain {
     }
 }
 
-pub fn write_block(path: &str, block: Block) {
-    let mut file = fs::OpenOptions::new()
-        .write(true)
-        .append(true)
-        .create(true)
-        .open(path)
-        .expect("cannot open file");
+pub fn build_path_for_block(block: &Block) -> String {
+    let block_id = block.id();
+    let hash_value = block_id.split(":").last().unwrap();
+    String::from(format!("{}.json", hash_value))
+}
 
-    file.write_all(serde_json::to_string(&block).unwrap().as_bytes())
-        .expect("write failed");
-    file.write_all(b"\n").expect("write failed");
+pub fn write_block(block: &Block) -> Result<()> {
+    use std::fs::File;
+    let path = build_path_for_block(&block);
+    Ok(serde_json::to_writer(&File::create(path)?, &block)?)
 }
 
 pub fn write_keypair(path: &str, data: &[u8; 64]) {
