@@ -40,5 +40,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!("transaction  accepted {}", t.signature().as_string());
             });
         });
+
     Ok(())
 }
