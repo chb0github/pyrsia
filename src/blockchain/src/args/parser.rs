@@ -33,7 +33,8 @@ pub struct BlockchainNodeArgs {
 impl BlockchainNodeArgs {
     pub fn new() -> Self {
         Self {
-            key_filename: DEFAULT_BLOCK_KEYPAIR_FILENAME.to_string()
+            key_filename: DEFAULT_BLOCK_KEYPAIR_FILENAME.to_string(),
+            peer_index: 1
         }
     }
 }

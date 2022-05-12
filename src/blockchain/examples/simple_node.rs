@@ -29,7 +29,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // If the key file exists, load the key pair. Otherwise, create a random keypair and save to the key file
     // let id_keys = create_ed25519_keypair();
     // If the key file exists, load the key pair. Otherwise, create a random keypair and save to the keypair file
-    let keypair = create_ed25519_keypair("keypair");
+    let keypair = create_ed25519_keypair(String::from("keypair"));
     let mut bc = Blockchain::new(&keypair);
 
     BufReader::new(stdin())
@@ -40,7 +40,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!("transaction  accepted {}", t.signature().as_string());
             });
         });
-<<<<<<< HEAD
     pretty_env_logger::init();
 
     let args = BlockchainNodeArgs::parse();
@@ -73,10 +72,10 @@ pub fn write_block(path: &str, block: Block) {
 }
 
 pub fn write_keypair(path: &String, data: &[u8; 64]) {
-    let mut file = fs::OpenOptions::new()
+    let mut file = std::fs::OpenOptions::new()
         .write(true)
         .create(true)
-        .mode(0o600)
+        // .mode(0o600)
         .open(path)
         .expect("cannot open file");
 
@@ -84,7 +83,7 @@ pub fn write_keypair(path: &String, data: &[u8; 64]) {
 }
 
 pub fn read_keypair(path: &String) -> Result<[u8; 64], Box<dyn Error>> {
-    let mut file = std::fs::File::open(path)?;
+    let mut file: std::fs::File = std::fs::File::open(path)?;
     let mut buf = [0u8; 64];
     let n = file.read(&mut buf)?;
     if n == 64 {
