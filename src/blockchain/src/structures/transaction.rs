@@ -14,6 +14,7 @@
    limitations under the License.
 */
 
+use std::hash::Hash;
 use codec::{Decode, Encode};
 use libp2p::identity;
 use rand::Rng;
@@ -23,6 +24,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use super::header::Address;
 use crate::crypto::hash_algorithm::HashDigest;
 use crate::signature::Signature;
+
+trait Payload<'a>: Deserialize<'a> + Serialize + Hash + Eq {}
+
+impl<'a, T: ?Sized + Deserialize<'a> + Serialize + Hash + Eq> Payload for T {}
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq, Copy, Decode, Encode)]
 pub enum TransactionType {
@@ -36,7 +41,7 @@ pub enum TransactionType {
 struct PartialTransaction {
     type_id: TransactionType,
     submitter: Address,
-    timestamp: u64,
+    timestamp: T,
     payload: Vec<u8>,
     nonce: u128,
 }
@@ -81,20 +86,22 @@ fn calculate_hash(
 pub type TransactionSignature = Signature;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq, Decode, Encode)]
-pub struct Transaction {
+pub struct Transaction<'a> {
     type_id: TransactionType,
     submitter: Address,
     timestamp: u64,
-    payload: Vec<u8>,
-    nonce: u128, // Adds a salt to harden
+    payload: dyn Payload<'a>,
+    nonce: u128,
+    // Adds a salt to harden
     hash: HashDigest,
     signature: TransactionSignature,
 }
+
 impl Transaction {
-    pub fn new(
+    pub fn new<'a, T: ?Sized + Payload<'a>>(
         type_id: TransactionType,
         submitter: Address,
-        payload: Vec<u8>,
+        payload: T,
         ed25519_keypair: &identity::ed25519::Keypair,
     ) -> Self {
         let partial_transaction = PartialTransaction {

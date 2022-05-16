@@ -23,6 +23,7 @@ use std::collections::HashMap;
 use std::fmt::{self, Debug, Formatter};
 use std::io::*;
 use std::{fs, io};
+use std::hash::Hash;
 
 use super::structures::{
     block::Block,
@@ -656,9 +657,13 @@ pub enum SignatureAlgorithm {
     Ed25519,
 }
 
-pub struct Blockchain {
+trait Payload<'a>: Deserialize<'a> + Serialize + Hash + Eq {}
+
+impl<'a,T: ?Sized + Deserialize<'a> + Serialize + Hash + Eq> Payload for T {}
+
+pub struct Blockchain<'a> {
     // this should actually be a Map<Transaction,Vec<OnTransactionSettled>> but that's later
-    trans_observers: HashMap<Transaction, Box<dyn FnOnce(Transaction)>>,
+    trans_observers: HashMap<Transaction<'a>, Box<dyn FnOnce(Transaction)>>,
     block_observers: Vec<Box<dyn FnMut(Block)>>,
     keypair: identity::ed25519::Keypair,
     submitter: Address,
@@ -702,9 +707,9 @@ impl Blockchain {
         self.chain.blocks.clone()
     }
 
-    pub fn submit_transaction<CallBack: 'static + FnOnce(Transaction)>(
+    pub fn submit_transaction<'a, T: ?Sized + Payload<'a>, CallBack: 'static + FnOnce(Transaction)>(
         &mut self,
-        payload: Vec<u8>,
+        payload: T,
         on_done: CallBack,
     ) -> Transaction {
         let trans = Transaction::new(
@@ -811,6 +816,7 @@ pub fn create_ed25519_keypair(path: &str) -> libp2p::identity::ed25519::Keypair 
         }
     }
 }
+
 fn generate_genesis() {
     let keypair = create_ed25519_keypair("keypair");
     let local_id = Address::from(identity::PublicKey::Ed25519(keypair.public()));
@@ -829,6 +835,7 @@ fn generate_genesis() {
     // as JSON. We then need to hardcode this output as the genesis block
     println!("{}", block);
 }
+
 #[cfg(test)]
 mod tests {
     use std::cell::Cell;
@@ -906,7 +913,9 @@ mod tests {
 
         assert!(called.get()); // called is still false
     }
+
     const TEST_KEYPAIR_FILENAME: &str = "./test_keypair";
+
     #[test]
     fn test_get_keyfile_name_succeeded() {
         let mut path = dirs::home_dir().unwrap();

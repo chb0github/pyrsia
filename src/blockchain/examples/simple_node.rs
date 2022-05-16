@@ -18,6 +18,7 @@ use std::io::{stdin, BufRead, BufReader};
 use std::{
     error::Error,
 };
+use libp2p::identity::ed25519::SecretKey;
 
 // use pyrsia_blockchain_network::blockchain::Blockchain;
 use pyrsia_blockchain_network::blockchain::{create_ed25519_keypair, Blockchain};
