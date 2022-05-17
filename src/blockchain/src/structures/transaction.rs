@@ -20,6 +20,7 @@ use libp2p::identity;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
+use identity::ed25519::Keypair;
 
 use super::header::Address;
 use crate::crypto::hash_algorithm::HashDigest;
@@ -27,7 +28,7 @@ use crate::signature::Signature;
 
 trait Payload<'a>: Deserialize<'a> + Serialize + Hash + Eq {}
 
-impl<'a, T: ?Sized + Deserialize<'a> + Serialize + Hash + Eq> Payload for T {}
+impl<'a, T: ?Sized + Deserialize<'a> + Serialize + Hash + Eq> Payload<'a> for T {}
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq, Copy, Decode, Encode)]
 pub enum TransactionType {
@@ -46,11 +47,9 @@ struct PartialTransaction<'a> {
     nonce: u128,
 }
 
-impl PartialTransaction {
-    fn convert_to_transaction(
-        self,
-        ed25519_keypair: &identity::ed25519::Keypair,
-    ) -> Result<Transaction, bincode::Error> {
+impl PartialTransaction<'_> {
+    fn convert_to_transaction(self, ed25519_keypair: &Keypair)
+        -> Result<Transaction, bincode::Error> {
         let hash = calculate_hash(&self)?;
         Ok(Transaction {
             type_id: self.type_id,
@@ -64,8 +63,8 @@ impl PartialTransaction {
     }
 }
 
-impl From<Transaction> for PartialTransaction {
-    fn from(transaction: Transaction) -> Self {
+impl From<Transaction<'_>> for PartialTransaction<'_> {
+    fn from(transaction: Transaction<'_>) -> Self {
         PartialTransaction {
             type_id: transaction.type_id,
             submitter: transaction.submitter,
@@ -97,12 +96,12 @@ pub struct Transaction<'a> {
     signature: TransactionSignature,
 }
 
-impl Transaction {
+impl Transaction<'_> {
     pub fn new<'a, T: ?Sized + Payload<'a>>(
         type_id: TransactionType,
         submitter: Address,
         payload: T,
-        ed25519_keypair: &identity::ed25519::Keypair,
+        ed25519_keypair: &Keypair,
     ) -> Self {
         let partial_transaction = PartialTransaction {
             type_id,
@@ -135,7 +134,7 @@ mod tests {
 
     #[test]
     fn test_transaction_new() {
-        let keypair = identity::ed25519::Keypair::generate();
+        let keypair = Keypair::generate();
         let local_id = Address::from(identity::PublicKey::Ed25519(keypair.public()));
 
         let transaction = Transaction::new(

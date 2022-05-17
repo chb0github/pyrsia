@@ -35,11 +35,11 @@ pub struct Block<'a> {
     signature: BlockSignature,
 }
 
-impl Block {
+impl Block<'_> {
     pub fn new(
         parent_hash: HashDigest,
         ordinal: u128,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Transaction<'_>>,
         signing_key: &Keypair,
     ) -> Self {
         let transaction_root = HashDigest::new(&bincode::serialize(&transactions).unwrap());
@@ -72,13 +72,13 @@ impl Block {
     }
 }
 
-impl PartialOrd for Block {
+impl PartialOrd for Block<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.header.ordinal.partial_cmp(&other.header.ordinal)
     }
 }
 
-impl Display for Block {
+impl Display for Block<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let json = serde_json::to_string_pretty(&self).expect("json format error");
         write!(f, "{}", json)
