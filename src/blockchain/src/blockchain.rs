@@ -659,7 +659,7 @@ pub enum SignatureAlgorithm {
 
 trait Payload<'a>: Deserialize<'a> + Serialize + Hash + Eq {}
 
-impl<'a,T: ?Sized + Deserialize<'a> + Serialize + Hash + Eq> Payload for T {}
+impl<'a,T: ?Sized + Deserialize<'a> + Serialize + Hash + Eq> Payload<'a> for T {}
 
 pub struct Blockchain<'a> {
     // this should actually be a Map<Transaction,Vec<OnTransactionSettled>> but that's later
@@ -667,10 +667,10 @@ pub struct Blockchain<'a> {
     block_observers: Vec<Box<dyn FnMut(Block)>>,
     keypair: identity::ed25519::Keypair,
     submitter: Address,
-    chain: Chain,
+    chain: Chain<'a>,
 }
 
-impl Debug for Blockchain {
+impl Debug for Blockchain<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Blockchain")
             .field("chain", &self.chain)
@@ -681,7 +681,7 @@ impl Debug for Blockchain {
     }
 }
 
-impl Blockchain {
+impl Blockchain<'_> {
     pub fn new(keypair: &Keypair) -> Self {
         let submitter = Address::from(Ed25519(keypair.public()));
         let genesis_block: Block = serde_json::from_str(GENESIS_BLOCK).expect("");

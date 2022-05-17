@@ -38,11 +38,11 @@ pub enum TransactionType {
 
 // Temporary structure to be able to calculate the hash of a transaction
 #[derive(Serialize)]
-struct PartialTransaction {
+struct PartialTransaction<'a> {
     type_id: TransactionType,
     submitter: Address,
-    timestamp: T,
-    payload: Vec<u8>,
+    timestamp: u64,
+    payload: dyn Payload<'a>,
     nonce: u128,
 }
 

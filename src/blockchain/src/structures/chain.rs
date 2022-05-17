@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use super::block::Block;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone, Decode, Encode, Hash, PartialEq, Eq)]
-pub struct Chain {
+pub struct Chain<'a> {
     // TODO(prince-chrismc): This eventually needs to be an ordered set so block sequence is always sorted by ordinal
-    pub blocks: Vec<Block>,
+    pub blocks: Vec<Block<'a>>,
 }

@@ -20,7 +20,6 @@ use std::{
 };
 use libp2p::identity::ed25519::SecretKey;
 
-// use pyrsia_blockchain_network::blockchain::Blockchain;
 use pyrsia_blockchain_network::blockchain::{create_ed25519_keypair, Blockchain};
 
 

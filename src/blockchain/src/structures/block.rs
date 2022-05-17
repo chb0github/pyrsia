@@ -29,9 +29,9 @@ use crate::signature::Signature;
 pub type BlockSignature = Signature;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Decode, Encode, Hash)]
-pub struct Block {
+pub struct Block<'a> {
     pub header: Header,
-    pub transactions: Vec<Transaction>,
+    pub transactions: Vec<Transaction<'a>>,
     signature: BlockSignature,
 }
 
