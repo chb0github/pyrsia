@@ -14,15 +14,11 @@
    limitations under the License.
 */
 
-use std::io::{stdin, BufRead, BufReader};
-use std::{
-    error::Error,
-};
 use libp2p::identity::ed25519::SecretKey;
+use std::error::Error;
+use std::io::{stdin, BufRead, BufReader};
 
 use pyrsia_blockchain_network::blockchain::{create_ed25519_keypair, Blockchain};
-
-
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {

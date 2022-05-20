@@ -29,17 +29,17 @@ use crate::signature::Signature;
 pub type BlockSignature = Signature;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Decode, Encode, Hash)]
-pub struct Block<'a> {
+pub struct Block {
     pub header: Header,
-    pub transactions: Vec<Transaction<'a>>,
+    pub transactions: Vec<Transaction>,
     signature: BlockSignature,
 }
 
-impl Block<'_> {
+impl Block {
     pub fn new(
         parent_hash: HashDigest,
         ordinal: u128,
-        transactions: Vec<Transaction<'_>>,
+        transactions: Vec<Transaction>,
         signing_key: &Keypair,
     ) -> Self {
         let transaction_root = HashDigest::new(&bincode::serialize(&transactions).unwrap());
@@ -72,13 +72,13 @@ impl Block<'_> {
     }
 }
 
-impl PartialOrd for Block<'_> {
+impl PartialOrd for Block {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.header.ordinal.partial_cmp(&other.header.ordinal)
     }
 }
 
-impl Display for Block<'_> {
+impl Display for Block {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let json = serde_json::to_string_pretty(&self).expect("json format error");
         write!(f, "{}", json)

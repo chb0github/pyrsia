@@ -21,9 +21,9 @@ use log::debug;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{self, Debug, Formatter};
+use std::hash::Hash;
 use std::io::*;
 use std::{fs, io};
-use std::hash::Hash;
 
 use super::structures::{
     block::Block,
@@ -657,20 +657,16 @@ pub enum SignatureAlgorithm {
     Ed25519,
 }
 
-trait Payload<'a>: Deserialize<'a> + Serialize + Hash + Eq {}
-
-impl<'a,T: ?Sized + Deserialize<'a> + Serialize + Hash + Eq> Payload<'a> for T {}
-
-pub struct Blockchain<'a> {
+pub struct Blockchain {
     // this should actually be a Map<Transaction,Vec<OnTransactionSettled>> but that's later
-    trans_observers: HashMap<Transaction<'a>, Box<dyn FnOnce(Transaction)>>,
+    trans_observers: HashMap<Transaction, Box<dyn FnOnce(Transaction)>>,
     block_observers: Vec<Box<dyn FnMut(Block)>>,
     keypair: identity::ed25519::Keypair,
     submitter: Address,
-    chain: Chain<'a>,
+    chain: Chain,
 }
 
-impl Debug for Blockchain<'_> {
+impl Debug for Blockchain {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Blockchain")
             .field("chain", &self.chain)
@@ -681,7 +677,7 @@ impl Debug for Blockchain<'_> {
     }
 }
 
-impl Blockchain<'_> {
+impl Blockchain {
     pub fn new(keypair: &Keypair) -> Self {
         let submitter = Address::from(Ed25519(keypair.public()));
         let genesis_block: Block = serde_json::from_str(GENESIS_BLOCK).expect("");
@@ -695,11 +691,9 @@ impl Blockchain<'_> {
             submitter,
             chain,
         };
-        me.add_block_listener(
-            move |b: Block| {
-                write_block(&b).expect("Block written to disk");
-            }
-        );
+        me.add_block_listener(move |b: Block| {
+            write_block(&b).expect("Block written to disk");
+        });
         me
     }
 
@@ -707,9 +701,9 @@ impl Blockchain<'_> {
         self.chain.blocks.clone()
     }
 
-    pub fn submit_transaction<'a, T: ?Sized + Payload<'a>, CallBack: 'static + FnOnce(Transaction)>(
+    pub fn submit_transaction<'a, CallBack: 'static + FnOnce(Transaction)>(
         &mut self,
-        payload: T,
+        payload: serde_json::Value,
         on_done: CallBack,
     ) -> Transaction {
         let trans = Transaction::new(
@@ -823,7 +817,7 @@ fn generate_genesis() {
     let transaction = Transaction::new(
         TransactionType::AddAuthority,
         local_id, // need to load from local file
-        keypair.public().encode().to_vec(),
+        serde_json::json!(keypair.public().encode()),
         &keypair,
     );
     let block = Block::new(
@@ -838,9 +832,9 @@ fn generate_genesis() {
 
 #[cfg(test)]
 mod tests {
+    use crate::args::parser::{BlockchainNodeArgs, DEFAULT_BLOCK_KEYPAIR_FILENAME};
     use std::cell::Cell;
     use std::rc::Rc;
-    use crate::args::parser::{BlockchainNodeArgs, DEFAULT_BLOCK_KEYPAIR_FILENAME};
 
     use super::*;
 

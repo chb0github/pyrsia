@@ -34,7 +34,7 @@ impl BlockchainNodeArgs {
     pub fn new() -> Self {
         Self {
             key_filename: DEFAULT_BLOCK_KEYPAIR_FILENAME.to_string(),
-            peer_index: 1
+            peer_index: 1,
         }
     }
 }

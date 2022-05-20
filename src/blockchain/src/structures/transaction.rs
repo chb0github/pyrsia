@@ -14,21 +14,17 @@
    limitations under the License.
 */
 
-use std::hash::Hash;
 use codec::{Decode, Encode};
+use identity::ed25519::Keypair;
 use libp2p::identity;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use std::hash::Hash;
 use std::time::{SystemTime, UNIX_EPOCH};
-use identity::ed25519::Keypair;
 
 use super::header::Address;
 use crate::crypto::hash_algorithm::HashDigest;
 use crate::signature::Signature;
-
-trait Payload<'a>: Deserialize<'a> + Serialize + Hash + Eq {}
-
-impl<'a, T: ?Sized + Deserialize<'a> + Serialize + Hash + Eq> Payload<'a> for T {}
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq, Copy, Decode, Encode)]
 pub enum TransactionType {
@@ -37,19 +33,23 @@ pub enum TransactionType {
     RevokeAuthority,
 }
 
+type JsonObject = serde_json::Value;
+
 // Temporary structure to be able to calculate the hash of a transaction
 #[derive(Serialize)]
-struct PartialTransaction<'a> {
+struct PartialTransaction {
     type_id: TransactionType,
     submitter: Address,
     timestamp: u64,
-    payload: dyn Payload<'a>,
+    payload: JsonObject,
     nonce: u128,
 }
 
-impl PartialTransaction<'_> {
-    fn convert_to_transaction(self, ed25519_keypair: &Keypair)
-        -> Result<Transaction, bincode::Error> {
+impl PartialTransaction {
+    fn convert_to_transaction(
+        self,
+        ed25519_keypair: &Keypair,
+    ) -> Result<Transaction, bincode::Error> {
         let hash = calculate_hash(&self)?;
         Ok(Transaction {
             type_id: self.type_id,
@@ -63,8 +63,8 @@ impl PartialTransaction<'_> {
     }
 }
 
-impl From<Transaction<'_>> for PartialTransaction<'_> {
-    fn from(transaction: Transaction<'_>) -> Self {
+impl From<Transaction> for PartialTransaction {
+    fn from(transaction: Transaction) -> Self {
         PartialTransaction {
             type_id: transaction.type_id,
             submitter: transaction.submitter,
@@ -85,22 +85,22 @@ fn calculate_hash(
 pub type TransactionSignature = Signature;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq, Decode, Encode)]
-pub struct Transaction<'a> {
+pub struct Transaction {
     type_id: TransactionType,
     submitter: Address,
     timestamp: u64,
-    payload: dyn Payload<'a>,
+    payload: JsonObject,
     nonce: u128,
     // Adds a salt to harden
     hash: HashDigest,
     signature: TransactionSignature,
 }
 
-impl Transaction<'_> {
-    pub fn new<'a, T: ?Sized + Payload<'a>>(
+impl Transaction {
+    pub fn new(
         type_id: TransactionType,
         submitter: Address,
-        payload: T,
+        payload: JsonObject,
         ed25519_keypair: &Keypair,
     ) -> Self {
         let partial_transaction = PartialTransaction {
@@ -120,7 +120,7 @@ impl Transaction<'_> {
     pub fn digest(&self) -> HashDigest {
         self.hash
     }
-    pub fn payload(&self) -> Vec<u8> {
+    pub fn payload(&self) -> JsonObject {
         self.payload.clone()
     }
     pub fn signature(&self) -> TransactionSignature {

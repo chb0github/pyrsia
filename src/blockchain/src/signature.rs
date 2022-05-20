@@ -37,7 +37,10 @@ impl Hash for Signature {
 
 impl Signature {
     pub fn as_string(&self) -> String {
-        format!("keccak256:{}", data_encoding::HEXLOWER_PERMISSIVE.encode(&self.signature.to_bytes()))
+        format!(
+            "keccak256:{}",
+            data_encoding::HEXLOWER_PERMISSIVE.encode(&self.signature.to_bytes())
+        )
     }
     pub fn from_bytes(msg: &[u8]) -> Result<Self, Error> {
         let sig = ed25519_dalek::Signature::from_bytes(msg)?;
