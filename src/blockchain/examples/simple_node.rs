@@ -14,17 +14,25 @@
    limitations under the License.
 */
 
-use libp2p::identity::ed25519::SecretKey;
 use std::error::Error;
 use std::io::{stdin, BufRead, BufReader};
 
 use pyrsia_blockchain_network::blockchain::{create_ed25519_keypair, Blockchain};
+use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Deserialize, Serialize, Hash, PartialEq, Eq)]
+struct Thing {
+    name: String,
+    age: usize,
+}
+
+///
+/// The main function's only job is to read from stdin and bulk up transactions
+/// When you're ready to save them all to a block type 'save'. At this moment, files only
+/// write to disk when the app exits - currently unknown why.
+///
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    // If the key file exists, load the key pair. Otherwise, create a random keypair and save to the key file
-    // let id_keys = create_ed25519_keypair();
-    // If the key file exists, load the key pair. Otherwise, create a random keypair and save to the keypair file
     let keypair = create_ed25519_keypair("keypair");
     let mut bc = Blockchain::new(&keypair);
 
@@ -32,9 +40,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .lines()
         .map(|l| l.unwrap())
         .for_each(|l| {
-            bc.submit_transaction(l.as_bytes().to_vec(), |t| {
-                println!("transaction  accepted {}", t.signature().as_string());
-            });
+            match l.as_str() {
+                "save" => {
+                    bc.save()
+                }
+                _ => {
+                    let thing = Thing {
+                        name: l,
+                        age: 10
+                    };
+                    bc.submit_transaction(thing, |t| {
+                        println!("transaction  accepted {}", t.signature().as_string());
+                    });
+                }
+            }
         });
 
     Ok(())

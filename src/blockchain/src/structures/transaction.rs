@@ -14,34 +14,25 @@
    limitations under the License.
 */
 
-use codec::{Decode, Encode};
 use identity::ed25519::Keypair;
 use libp2p::identity;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 use std::time::{SystemTime, UNIX_EPOCH};
+use serde_json::Value;
 
 use super::header::Address;
 use crate::crypto::hash_algorithm::HashDigest;
 use crate::signature::Signature;
 
-#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq, Copy, Decode, Encode)]
-pub enum TransactionType {
-    Create,
-    AddAuthority,
-    RevokeAuthority,
-}
-
-type JsonObject = serde_json::Value;
 
 // Temporary structure to be able to calculate the hash of a transaction
 #[derive(Serialize)]
 struct PartialTransaction {
-    type_id: TransactionType,
     submitter: Address,
     timestamp: u64,
-    payload: JsonObject,
+    payload: Value,
     nonce: u128,
 }
 
@@ -52,7 +43,6 @@ impl PartialTransaction {
     ) -> Result<Transaction, bincode::Error> {
         let hash = calculate_hash(&self)?;
         Ok(Transaction {
-            type_id: self.type_id,
             submitter: self.submitter,
             timestamp: self.timestamp,
             payload: self.payload,
@@ -66,7 +56,6 @@ impl PartialTransaction {
 impl From<Transaction> for PartialTransaction {
     fn from(transaction: Transaction) -> Self {
         PartialTransaction {
-            type_id: transaction.type_id,
             submitter: transaction.submitter,
             timestamp: transaction.timestamp,
             payload: transaction.payload,
@@ -84,27 +73,35 @@ fn calculate_hash(
 
 pub type TransactionSignature = Signature;
 
-#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq, Decode, Encode)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Transaction {
-    type_id: TransactionType,
     submitter: Address,
     timestamp: u64,
-    payload: JsonObject,
+    payload: Value,
     nonce: u128,
     // Adds a salt to harden
     hash: HashDigest,
     signature: TransactionSignature,
 }
 
+impl Hash for Transaction {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.submitter.hash(state);
+        self.timestamp.hash(state);
+        hash_value(&self.payload, state);
+        self.nonce.hash(state);
+        self.hash.hash(state);
+        self.signature.hash(state);
+    }
+}
+
 impl Transaction {
     pub fn new(
-        type_id: TransactionType,
         submitter: Address,
-        payload: JsonObject,
+        payload: Value,
         ed25519_keypair: &Keypair,
     ) -> Self {
         let partial_transaction = PartialTransaction {
-            type_id,
             submitter,
             timestamp: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -117,10 +114,11 @@ impl Transaction {
             .convert_to_transaction(ed25519_keypair)
             .unwrap()
     }
+
     pub fn digest(&self) -> HashDigest {
         self.hash
     }
-    pub fn payload(&self) -> JsonObject {
+    pub fn payload(&self) -> Value {
         self.payload.clone()
     }
     pub fn signature(&self) -> TransactionSignature {
@@ -128,19 +126,35 @@ impl Transaction {
     }
 }
 
+fn hash_value<H: Hasher>(val: &Value, state: &mut H) {
+    match val {
+        Value::Null => 0.hash(state),
+        Value::Bool(b) => b.hash(state),
+        Value::Number(n) => n.hash(state),
+        Value::String(s) => s.hash(state),
+        Value::Array(a) => a.iter().for_each(|v| hash_value(v, state)),
+        Value::Object(o) => {
+            o.iter().for_each(|e| {
+                e.0.hash(state);
+                hash_value(e.1, state);
+            })
+        }
+    };
+    ()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use serde_json::json;
     #[test]
     fn test_transaction_new() {
         let keypair = Keypair::generate();
         let local_id = Address::from(identity::PublicKey::Ed25519(keypair.public()));
 
         let transaction = Transaction::new(
-            TransactionType::Create,
             local_id,
-            b"Hello First Transaction".to_vec(),
+            json!("Hello First Transaction"),
             &keypair,
         );
         let partial: PartialTransaction = transaction.clone().into();

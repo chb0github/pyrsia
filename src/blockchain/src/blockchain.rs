@@ -19,17 +19,17 @@ use libp2p::identity;
 use libp2p::identity::ed25519::Keypair;
 use log::debug;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Debug, Formatter};
-use std::hash::Hash;
 use std::io::*;
 use std::{fs, io};
+use serde_json::{json};
 
 use super::structures::{
     block::Block,
     chain::Chain,
     header::Address,
-    transaction::{Transaction, TransactionType},
+    transaction::Transaction,
 };
 
 const GENESIS_BLOCK: &str = r#"
@@ -661,6 +661,7 @@ pub struct Blockchain {
     // this should actually be a Map<Transaction,Vec<OnTransactionSettled>> but that's later
     trans_observers: HashMap<Transaction, Box<dyn FnOnce(Transaction)>>,
     block_observers: Vec<Box<dyn FnMut(Block)>>,
+    pending_transaction: HashSet<Transaction>,
     keypair: identity::ed25519::Keypair,
     submitter: Address,
     chain: Chain,
@@ -687,6 +688,7 @@ impl Blockchain {
         let mut me = Blockchain {
             trans_observers: Default::default(),
             block_observers: vec![],
+            pending_transaction: Default::default(),
             keypair: keypair.clone(),
             submitter,
             chain,
@@ -700,21 +702,75 @@ impl Blockchain {
     pub fn blocks(&self) -> Vec<Block> {
         self.chain.blocks.clone()
     }
-
-    pub fn submit_transaction<'a, CallBack: 'static + FnOnce(Transaction)>(
+    pub fn save(&mut self) {
+        let txs = self.pending_transaction.drain().collect();
+        let last = self.chain.blocks.last().unwrap().clone();
+        self.add_block(Block::new(
+            last.header.hash(),
+            last.ordinal() + 1,
+            txs,
+            &self.keypair,
+        ))
+    }
+    /// When submitting a transaction, it may not settle for some time as it will be settled
+    /// With other transactions as a block when this node is selected as the authority.
+    /// The following are working examples of how to use this API
+    /// *Example*
+    /// ```rust
+    /// use std::collections::HashMap;
+    /// use serde::Serialize;
+    /// use pyrsia_blockchain_network::blockchain::{Blockchain, create_ed25519_keypair};
+    /// #[derive(Serialize)]
+    /// struct Thing {
+    ///     name: String,
+    ///     age: usize,
+    /// }
+    /// let thing = Thing {
+    ///     name: String::from("Christian Bongiorno"),
+    ///     age: 10
+    /// };
+    ///  let keypair = create_ed25519_keypair("keypair");
+    ///  let mut bc = Blockchain::new(&keypair);
+    ///  bc.submit_transaction(thing, |t| {
+    ///     println!("transaction  accepted {}", t.signature().as_string());
+    ///  });
+    ///  bc.submit_transaction([1, 2, 3], |t| {
+    ///    println!("transaction  accepted {}", t.signature().as_string());
+    ///  });
+    ///  let map = HashMap::from([
+    ///     ("im-a-map", String::from("hello")),
+    ///     ("something", String::from("10")),
+    /// ]);
+    /// bc.submit_transaction(map, |t| {
+    ///     println!("transaction  accepted {}", t.signature().as_string());
+    /// });
+    /// ```
+    /// There are some caveats here
+    /// 1. Usage of a map, with mixed types, is not possible.
+    /// A Java equivalent of `Map<String,Object>` doesn't see to be doable. So you can't have
+    /// ```rust
+    /// use std::collections::HashMap;
+    /// let map = HashMap::from([
+    ///     ("im-a-map", String::from("hello")),
+    ///    // ("something", 10), // won't compile
+    /// ]);
+    /// ```
+    /// Because the Map derives it's generic types from the first tuple, which is different from the second
+    ///
+    pub fn submit_transaction<T, CallBack: 'static + FnOnce(Transaction)>(
         &mut self,
-        payload: serde_json::Value,
+        payload: T,
         on_done: CallBack,
-    ) -> Transaction {
+    ) -> Transaction where T: Sized + Serialize {
         let trans = Transaction::new(
-            TransactionType::Create,
             self.submitter,
-            payload,
+            json!(payload),
             &self.keypair,
         );
-        self.trans_observers
-            .insert(trans.clone(), Box::new(on_done));
-        trans
+
+        self.trans_observers.insert(trans.clone(), Box::new(on_done));
+        self.pending_transaction.insert(trans.clone());
+        trans.clone()
     }
 
     pub fn notify_transaction_settled(&mut self, trans: Transaction) {
@@ -754,7 +810,9 @@ impl Blockchain {
 pub fn build_path_for_block(block: &Block) -> String {
     let block_id = block.id();
     let hash_value = block_id.split(":").last().unwrap();
-    String::from(format!("{}.json", hash_value))
+    use std::env;
+
+    String::from(format!("{}.json",env::temp_dir().join(hash_value).to_str().unwrap()))
 }
 
 pub fn write_block(block: &Block) -> Result<()> {
@@ -811,13 +869,16 @@ pub fn create_ed25519_keypair(path: &str) -> libp2p::identity::ed25519::Keypair 
     }
 }
 
+#[allow(unused)]
 fn generate_genesis() {
     let keypair = create_ed25519_keypair("keypair");
     let local_id = Address::from(identity::PublicKey::Ed25519(keypair.public()));
     let transaction = Transaction::new(
-        TransactionType::AddAuthority,
         local_id, // need to load from local file
-        serde_json::json!(keypair.public().encode()),
+        json!({
+            "type" : "AddAuthority",
+            "key" : data_encoding::BASE64.encode(&keypair.public().encode())
+        }),
         &keypair,
     );
     let block = Block::new(
@@ -838,29 +899,19 @@ mod tests {
 
     use super::*;
 
+    #[derive(Serialize, Clone, Eq, PartialEq, Debug, Deserialize)]
+    struct Thing {
+        name: String,
+        age: usize,
+    }
+
     #[test]
     fn test_build_blockchain() {
-        let keypair = Keypair::generate();
-        let local_id = Address::from(Ed25519(keypair.public()));
-        let mut chain = Blockchain::new(&keypair);
+        let mut chain = Blockchain::new(&Keypair::generate());
+        chain.submit_transaction("Hello First Transaction", |_| {});
 
-        let mut transactions = vec![];
-        let data = "Hello First Transaction";
-        let transaction = Transaction::new(
-            TransactionType::Create,
-            local_id,
-            data.as_bytes().to_vec(),
-            &keypair,
-        );
-        transactions.push(transaction);
-        chain.add_block(Block::new(
-            chain.blocks()[0].header.hash(),
-            chain.blocks()[0].header.ordinal + 1,
-            transactions,
-            &keypair,
-        ));
         assert_eq!(true, chain.blocks().last().unwrap().verify());
-        assert_eq!(2, chain.blocks().len());
+        assert_eq!(1, chain.blocks().len());
     }
 
     #[test]
@@ -869,41 +920,47 @@ mod tests {
         let mut bc = Blockchain::new(&keypair);
 
         let called = Rc::new(Cell::new(false));
-        let data = "some transaction".as_bytes().to_vec();
-        let trans = bc.submit_transaction(data.clone(), {
+        let data = Thing {
+            name: String::from("Christian"),
+            age: 10,
+        };
+        bc.submit_transaction(data.clone(), {
             let called = called.clone();
             let d = data.clone();
             move |t: Transaction| {
-                assert_eq!(d, t.payload());
+                let result: Thing = serde_json::from_value(t.payload()).unwrap();
+                assert_eq!(d, result);
                 called.set(true)
             }
         });
-        bc.notify_transaction_settled(trans);
+        bc.save();
         assert!(called.get());
     }
 
     #[test]
     fn test_add_block_listener() {
         let keypair = Keypair::generate();
-        let block = Block::new(
-            HashDigest::new(b"Hello World!"),
-            1u128,
-            Vec::new(),
-            &keypair,
-        );
+
         let mut chain = Blockchain::new(&keypair);
         let called = Rc::new(Cell::new(false));
 
-        chain
-            .add_block_listener({
-                let called = called.clone();
-                let block = block.clone();
-                move |b: Block| {
-                    assert_eq!(block, b);
-                    called.set(true);
-                }
-            })
-            .add_block(block);
+        chain.add_block_listener({
+            let called = called.clone();
+            move |b: Block| {
+                let result: Thing = serde_json::from_value(
+                    b.transactions.last().unwrap().payload()
+                ).unwrap();
+                assert_eq!(
+                    Thing { name: String::from("christian"), age: 10 },
+                    result
+                );
+                called.set(true);
+            }
+        }).submit_transaction(
+            Thing { name: String::from("christian"), age: 10 },
+            |_| {}
+        );
+        chain.save();
 
         assert!(called.get()); // called is still false
     }

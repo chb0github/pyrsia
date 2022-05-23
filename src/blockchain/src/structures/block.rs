@@ -14,12 +14,12 @@
    limitations under the License.
 */
 
-use codec::{Decode, Encode};
 use libp2p::identity;
 use libp2p::identity::ed25519::Keypair;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
+use identity::PublicKey::Ed25519;
 
 use super::header::{Address, Header};
 use super::transaction::Transaction;
@@ -28,11 +28,16 @@ use crate::signature::Signature;
 
 pub type BlockSignature = Signature;
 
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Decode, Encode, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Block {
     pub header: Header,
     pub transactions: Vec<Transaction>,
     signature: BlockSignature,
+}
+impl Ord for Block {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.header.ordinal.cmp(&other.header.ordinal)
+    }
 }
 
 impl Block {
@@ -46,7 +51,7 @@ impl Block {
         let header = Header::new(
             parent_hash,
             transaction_root,
-            Address::from(identity::PublicKey::Ed25519(signing_key.public())),
+            Address::from(Ed25519(signing_key.public())),
             ordinal,
         );
         Self {
@@ -87,18 +92,17 @@ impl Display for Block {
 
 #[cfg(test)]
 mod tests {
-    use super::super::transaction::TransactionType;
+    use serde_json::json;
     use super::*;
 
     #[test]
     fn test_build_block() -> Result<(), String> {
         let keypair = identity::ed25519::Keypair::generate();
-        let local_id = Address::from(identity::PublicKey::Ed25519(keypair.public()));
+        let local_id = Address::from(Ed25519(keypair.public()));
 
         let transactions = vec![Transaction::new(
-            TransactionType::Create,
             local_id,
-            b"Hello First Transaction".to_vec(),
+            json!("Hello First Transaction"),
             &keypair,
         )];
         let block = Block::new(HashDigest::new(b""), 1, transactions.to_vec(), &keypair);
