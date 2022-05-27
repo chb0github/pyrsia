@@ -14,12 +14,11 @@
    limitations under the License.
 */
 
-use libp2p::identity;
+use libp2p::core::identity::PublicKey::Ed25519;
 use libp2p::identity::ed25519::Keypair;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
-use identity::PublicKey::Ed25519;
 
 use super::header::{Address, Header};
 use super::transaction::Transaction;
@@ -32,7 +31,7 @@ pub type BlockSignature = Signature;
 pub struct Block {
     pub header: Header,
     pub transactions: Vec<Transaction>,
-    signature: BlockSignature,
+    pub signature: BlockSignature,
 }
 impl Ord for Block {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -54,10 +53,11 @@ impl Block {
             Address::from(Ed25519(signing_key.public())),
             ordinal,
         );
+        let msg: Vec<u8> = format_header(&header);
         Self {
             header,
             transactions,
-            signature: Signature::new(&bincode::serialize(&header.hash()).unwrap(), signing_key),
+            signature: Signature::new(&msg, signing_key),
         }
     }
 
@@ -72,9 +72,18 @@ impl Block {
     }
 
     // After merging Aleph consensus algorithm, it would be implemented
-    pub fn verify(&self) -> bool {
-        true
+    pub fn verify(&self, signing_key: &Keypair) -> bool {
+        println!("header = {:?}", self.header);
+        let msg: Vec<u8> = format_header(&self.header);
+        println!("msg = {:?}", msg);
+        println!("Public key {:?}", signing_key.public());
+        println!("sig = {:?}", self.signature.as_string());
+        self.signature.verify(&msg, signing_key)
     }
+}
+
+fn format_header(header: &Header) -> Vec<u8> {
+    bincode::serialize(&header.hash()).unwrap()
 }
 
 impl PartialOrd for Block {
@@ -92,11 +101,13 @@ impl Display for Block {
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn test_build_block() -> Result<(), String> {
+        use libp2p::identity;
+
         let keypair = identity::ed25519::Keypair::generate();
         let local_id = Address::from(Ed25519(keypair.public()));
 
@@ -106,11 +117,14 @@ mod tests {
             &keypair,
         )];
         let block = Block::new(HashDigest::new(b""), 1, transactions.to_vec(), &keypair);
+        let signature = keypair.sign(&bincode::serialize(&block.header.hash()).unwrap());
         let expected_signature =
             Signature::new(&bincode::serialize(&block.header.hash()).unwrap(), &keypair);
 
         assert_eq!(1, block.header.ordinal);
         assert_eq!(expected_signature.as_string(), block.signature());
+        assert!(keypair.public().verify(&bincode::serialize(&block.header.hash()).unwrap(), &signature));
+        assert!(block.verify(&keypair));
         Ok(())
     }
 }
