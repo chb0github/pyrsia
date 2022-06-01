@@ -742,7 +742,7 @@ impl Blockchain {
     /// ```rust
     /// use std::collections::HashMap;
     /// use serde::Serialize;
-    /// use pyrsia_blockchain_network::blockchain::{Blockchain, create_ed25519_keypair};
+    /// use pyrsia_blockchain_network::blockchain::{Blockchain, BlockKeypair, create_ed25519_keypair};
     /// #[derive(Serialize)]
     /// struct Thing {
     ///     name: String,
@@ -753,11 +753,12 @@ impl Blockchain {
     ///     age: 10
     /// };
     ///  let keypair = create_ed25519_keypair("keypair");
-    ///  let mut bc = Blockchain::new(&keypair);
+    ///  let mut bc = Blockchain::new(&BlockKeypair::new(&keypair));
     ///  bc.submit_transaction(thing, |t| {
     ///     println!("transaction  accepted {}", t.signature().as_string());
     ///  });
-    ///  bc.submit_transaction([1, 2, 3], |t| {
+    ///  let mut array: [i32; 3] = [1, 2, 3];
+    ///  bc.submit_transaction(array, |t| {
     ///    println!("transaction  accepted {}", t.signature().as_string());
     ///  });
     ///  let map = HashMap::from([
@@ -825,6 +826,7 @@ impl Blockchain {
 
     #[warn(dead_code)]
     pub fn add_block(&mut self, block: Block) {
+        block.verify().expect("Block has a valid signature");
         self.chain.blocks.push(block);
         self.notify_block_event(self.chain.blocks.last().expect("block must exist").clone());
     }
@@ -939,7 +941,7 @@ mod tests {
         println!("Public key {:?}", keypair.public());
         let trans: Transaction = chain.submit_transaction("Hello First Transaction", |_| {});
         chain.add_block_listener(move |b: Block| {
-            assert!(b.verify());
+            b.verify().unwrap();
         });
         chain.save();
     }

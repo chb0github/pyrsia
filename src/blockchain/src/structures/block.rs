@@ -74,9 +74,12 @@ impl Block {
     }
 
     // After merging Aleph consensus algorithm, it would be implemented
-    pub fn verify(&self) -> bool {
+    pub fn verify(&self) -> Result<(), &str> {
         let msg: Vec<u8> = format_header(&self.header);
-        self.signature.verify(&msg, &self.signing_key)
+        if self.signature.verify(&msg, &self.signing_key) {
+            return Ok(())
+        }
+        Err("Signature verification fail")
     }
 }
 
@@ -103,7 +106,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn test_build_block() -> Result<(), String> {
+    fn test_build_block() {
         use libp2p::identity;
 
         let keypair = identity::ed25519::Keypair::generate();
@@ -132,7 +135,6 @@ mod tests {
             &bincode::serialize(&block.header.hash()).unwrap(),
             &signature
         ));
-        assert!(block.verify());
-        Ok(())
+        block.verify().unwrap();
     }
 }
