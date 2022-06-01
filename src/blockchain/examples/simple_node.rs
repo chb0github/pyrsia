@@ -19,6 +19,7 @@ use std::io::{stdin, BufRead, BufReader};
 
 use pyrsia_blockchain_network::blockchain::{create_ed25519_keypair, Blockchain};
 use serde::{Deserialize, Serialize};
+use pyrsia_blockchain_network::blockchain::BlockKeypair;
 
 #[derive(Debug, Deserialize, Serialize, Hash, PartialEq, Eq)]
 struct Thing {
@@ -34,25 +35,18 @@ struct Thing {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let keypair = create_ed25519_keypair("keypair");
-    let mut bc = Blockchain::new(&keypair);
+    let mut bc = Blockchain::new(&BlockKeypair::new(&keypair));
 
     BufReader::new(stdin())
         .lines()
         .map(|l| l.unwrap())
-        .for_each(|l| {
-            match l.as_str() {
-                "save" => {
-                    bc.save()
-                }
-                _ => {
-                    let thing = Thing {
-                        name: l,
-                        age: 10
-                    };
-                    bc.submit_transaction(thing, |t| {
-                        println!("transaction  accepted {}", t.signature().as_string());
-                    });
-                }
+        .for_each(|l| match l.as_str() {
+            "save" => bc.save(),
+            _ => {
+                let thing = Thing { name: l, age: 10 };
+                bc.submit_transaction(thing, |t| {
+                    println!("transaction  accepted {}", t.signature().as_string());
+                });
             }
         });
 

@@ -14,6 +14,7 @@
    limitations under the License.
 */
 
+use crate::blockchain::BlockKeypair;
 use aleph_bft::NodeIndex;
 use libp2p::core::identity::ed25519::{Keypair, PublicKey};
 
@@ -22,11 +23,11 @@ use super::signature::Signature;
 #[derive(Clone)]
 pub struct AuthorityPen {
     index: NodeIndex,
-    keypair: Keypair,
+    keypair: BlockKeypair,
 }
 
 impl AuthorityPen {
-    pub fn new(index: NodeIndex, keypair: Keypair) -> Self {
+    pub fn new(index: NodeIndex, keypair: BlockKeypair) -> Self {
         Self { index, keypair }
     }
     pub fn index(&self) -> NodeIndex {
@@ -47,7 +48,7 @@ mod tests {
     #[test]
     fn test_auth_pen_sign() {
         let keypair = Keypair::generate();
-        let auth_pen = AuthorityPen::new(0.into(), keypair.clone());
+        let auth_pen = AuthorityPen::new(0.into(), BlockKeypair::new(&keypair));
         let signed = auth_pen.sign(b"hello world!");
 
         assert!(keypair.public().verify(b"hello world!", &signed.to_bytes()));

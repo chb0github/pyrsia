@@ -18,14 +18,14 @@ use identity::ed25519::Keypair;
 use libp2p::identity;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::hash::{Hash, Hasher};
 use std::time::{SystemTime, UNIX_EPOCH};
-use serde_json::Value;
 
 use super::header::Address;
+use crate::blockchain::BlockKeypair;
 use crate::crypto::hash_algorithm::HashDigest;
 use crate::signature::Signature;
-
 
 // Temporary structure to be able to calculate the hash of a transaction
 #[derive(Serialize)]
@@ -39,7 +39,7 @@ struct PartialTransaction {
 impl PartialTransaction {
     fn convert_to_transaction(
         self,
-        ed25519_keypair: &Keypair,
+        ed25519_keypair: &BlockKeypair,
     ) -> Result<Transaction, bincode::Error> {
         let hash = calculate_hash(&self)?;
         Ok(Transaction {
@@ -96,11 +96,7 @@ impl Hash for Transaction {
 }
 
 impl Transaction {
-    pub fn new(
-        submitter: Address,
-        payload: Value,
-        ed25519_keypair: &Keypair,
-    ) -> Self {
+    pub fn new(submitter: Address, payload: Value, ed25519_keypair: &BlockKeypair) -> Self {
         let partial_transaction = PartialTransaction {
             submitter,
             timestamp: SystemTime::now()
@@ -133,12 +129,10 @@ fn hash_value<H: Hasher>(val: &Value, state: &mut H) {
         Value::Number(n) => n.hash(state),
         Value::String(s) => s.hash(state),
         Value::Array(a) => a.iter().for_each(|v| hash_value(v, state)),
-        Value::Object(o) => {
-            o.iter().for_each(|e| {
-                e.0.hash(state);
-                hash_value(e.1, state);
-            })
-        }
+        Value::Object(o) => o.iter().for_each(|e| {
+            e.0.hash(state);
+            hash_value(e.1, state);
+        }),
     };
     ()
 }
@@ -155,12 +149,14 @@ mod tests {
         let transaction = Transaction::new(
             local_id,
             json!("Hello First Transaction"),
-            &keypair,
+            &BlockKeypair::new(&keypair),
         );
         let partial: PartialTransaction = transaction.clone().into();
         let expected_hash = calculate_hash(&partial).unwrap();
-        let expected_signature =
-            Signature::new(&bincode::serialize(&expected_hash).unwrap(), &keypair);
+        let expected_signature = Signature::new(
+            &bincode::serialize(&expected_hash).unwrap(),
+            &BlockKeypair::new(&keypair),
+        );
 
         assert_eq!(expected_hash, transaction.digest());
         assert_eq!(expected_signature, transaction.signature());

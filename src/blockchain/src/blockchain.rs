@@ -19,18 +19,72 @@ use libp2p::identity;
 use libp2p::identity::ed25519::Keypair;
 use log::debug;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_with::DeserializeFromStr;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Debug, Formatter};
 use std::io::*;
+use std::str::FromStr;
 use std::{fs, io};
-use serde_json::{json};
 
-use super::structures::{
-    block::Block,
-    chain::Chain,
-    header::Address,
-    transaction::Transaction,
-};
+use super::structures::{block::Block, chain::Chain, header::Address, transaction::Transaction};
+
+#[derive(serde_with::DeserializeFromStr)]
+pub struct BlockKeypair(libp2p::identity::ed25519::Keypair);
+
+impl BlockKeypair {
+    pub fn public(&self) -> libp2p::identity::ed25519::PublicKey {
+        self.0.public()
+    }
+    pub fn sign(&self, msg: &[u8]) -> Vec<u8> {
+        self.0.sign(msg)
+    }
+    pub fn verify(&self, msg: &Vec<u8>, signature: &Vec<u8>) -> bool {
+        self.0.public().verify(msg, signature)
+    }
+    pub fn new(keypair: &libp2p::core::identity::ed25519::Keypair) -> Self {
+        BlockKeypair(keypair.clone())
+    }
+}
+impl std::fmt::Debug for BlockKeypair {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BlockKeypair")
+            .field("keypair", &self.0)
+            .finish()
+    }
+}
+
+impl Serialize for BlockKeypair {
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str("")
+    }
+}
+impl FromStr for BlockKeypair {
+    type Err = String;
+    fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
+        Ok(BlockKeypair{0: Keypair::generate()})
+    }
+}
+
+impl std::hash::Hash for BlockKeypair {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.encode().hash(state)
+    }
+}
+impl PartialEq for BlockKeypair {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.encode().eq(&other.0.encode())
+    }
+}
+impl Eq for BlockKeypair {}
+impl Clone for BlockKeypair {
+    fn clone(&self) -> Self {
+        BlockKeypair(self.0.clone())
+    }
+}
 
 const GENESIS_BLOCK: &str = r#"
 {
@@ -662,7 +716,7 @@ pub struct Blockchain {
     trans_observers: HashMap<Transaction, Box<dyn FnOnce(Transaction)>>,
     block_observers: Vec<Box<dyn FnMut(Block)>>,
     pending_transaction: HashSet<Transaction>,
-    keypair: identity::ed25519::Keypair,
+    keypair: BlockKeypair,
     submitter: Address,
     chain: Chain,
 }
@@ -679,7 +733,7 @@ impl Debug for Blockchain {
 }
 
 impl Blockchain {
-    pub fn new(keypair: &Keypair) -> Self {
+    pub fn new(keypair: &BlockKeypair) -> Self {
         let submitter = Address::from(Ed25519(keypair.public()));
         let genesis_block: Block = serde_json::from_str(GENESIS_BLOCK).expect("");
         let mut chain: Chain = Default::default();
@@ -761,14 +815,14 @@ impl Blockchain {
         &mut self,
         payload: T,
         on_done: CallBack,
-    ) -> Transaction where T: Sized + Serialize {
-        let trans = Transaction::new(
-            self.submitter,
-            json!(payload),
-            &self.keypair,
-        );
+    ) -> Transaction
+    where
+        T: Sized + Serialize,
+    {
+        let trans = Transaction::new(self.submitter, json!(payload), &self.keypair);
 
-        self.trans_observers.insert(trans.clone(), Box::new(on_done));
+        self.trans_observers
+            .insert(trans.clone(), Box::new(on_done));
         self.pending_transaction.insert(trans.clone());
         trans.clone()
     }
@@ -812,7 +866,10 @@ pub fn build_path_for_block(block: &Block) -> String {
     let hash_value = block_id.split(":").last().unwrap();
     use std::env;
 
-    String::from(format!("{}.json",env::temp_dir().join(hash_value).to_str().unwrap()))
+    String::from(format!(
+        "{}.json",
+        env::temp_dir().join(hash_value).to_str().unwrap()
+    ))
 }
 
 pub fn write_block(block: &Block) -> Result<()> {
@@ -869,8 +926,9 @@ pub fn create_ed25519_keypair(path: &str) -> libp2p::identity::ed25519::Keypair 
     }
 }
 
-#[allow(unused)]
+#[test]
 fn generate_genesis() {
+    println!("Start method");
     let keypair = create_ed25519_keypair("keypair");
     let local_id = Address::from(identity::PublicKey::Ed25519(keypair.public()));
     let transaction = Transaction::new(
@@ -879,16 +937,18 @@ fn generate_genesis() {
             "type" : "AddAuthority",
             "key" : data_encoding::BASE64.encode(&keypair.public().encode())
         }),
-        &keypair,
+        &BlockKeypair(keypair.clone()),
     );
     let block = Block::new(
         HashDigest::new("".as_bytes()),
         0,
         Vec::from([transaction]),
-        &keypair,
+        &BlockKeypair(keypair.clone()),
     );
-    // as JSON. We then need to hardcode this output as the genesis block
+    println!("Hello, World!");
     println!("{}", block);
+    // as JSON. We then need to hardcode this output as the genesis block
+    debug!("{}", block);
 }
 
 #[cfg(test)]
@@ -907,17 +967,20 @@ mod tests {
 
     #[test]
     fn test_build_blockchain() {
-        let mut chain = Blockchain::new(&Keypair::generate());
-        chain.submit_transaction("Hello First Transaction", |_| {});
-
-        assert_eq!(true, chain.blocks().last().unwrap().verify());
-        assert_eq!(1, chain.blocks().len());
+        let keypair: Keypair = Keypair::generate();
+        let mut chain = Blockchain::new(&BlockKeypair(keypair.clone()));
+        println!("Public key {:?}", keypair.public());
+        let trans: Transaction = chain.submit_transaction("Hello First Transaction", |_| {});
+        chain.add_block_listener(move |b: Block| {
+            assert!(b.verify());
+        });
+        chain.save();
     }
 
     #[test]
     fn test_add_trans_listener() {
         let keypair = Keypair::generate();
-        let mut bc = Blockchain::new(&keypair);
+        let mut bc = Blockchain::new(&BlockKeypair(keypair));
 
         let called = Rc::new(Cell::new(false));
         let data = Thing {
@@ -941,25 +1004,32 @@ mod tests {
     fn test_add_block_listener() {
         let keypair = Keypair::generate();
 
-        let mut chain = Blockchain::new(&keypair);
+        let mut chain = Blockchain::new(&BlockKeypair(keypair));
         let called = Rc::new(Cell::new(false));
 
-        chain.add_block_listener({
-            let called = called.clone();
-            move |b: Block| {
-                let result: Thing = serde_json::from_value(
-                    b.transactions.last().unwrap().payload()
-                ).unwrap();
-                assert_eq!(
-                    Thing { name: String::from("christian"), age: 10 },
-                    result
-                );
-                called.set(true);
-            }
-        }).submit_transaction(
-            Thing { name: String::from("christian"), age: 10 },
-            |_| {}
-        );
+        chain
+            .add_block_listener({
+                let called = called.clone();
+                move |b: Block| {
+                    let result: Thing =
+                        serde_json::from_value(b.transactions.last().unwrap().payload()).unwrap();
+                    assert_eq!(
+                        Thing {
+                            name: String::from("christian"),
+                            age: 10
+                        },
+                        result
+                    );
+                    called.set(true);
+                }
+            })
+            .submit_transaction(
+                Thing {
+                    name: String::from("christian"),
+                    age: 10,
+                },
+                |_| {},
+            );
         chain.save();
 
         assert!(called.get()); // called is still false

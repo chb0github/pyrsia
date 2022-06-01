@@ -16,22 +16,23 @@
 
 use libp2p::core::identity::PublicKey::Ed25519;
 use libp2p::identity::ed25519::Keypair;
+
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 
 use super::header::{Address, Header};
 use super::transaction::Transaction;
+use crate::blockchain::BlockKeypair;
 use crate::crypto::hash_algorithm::HashDigest;
 use crate::signature::Signature;
-
-pub type BlockSignature = Signature;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Block {
     pub header: Header,
     pub transactions: Vec<Transaction>,
-    pub signature: BlockSignature,
+    pub signing_key: BlockKeypair,
+    pub signature: Signature,
 }
 impl Ord for Block {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -44,7 +45,7 @@ impl Block {
         parent_hash: HashDigest,
         ordinal: u128,
         transactions: Vec<Transaction>,
-        signing_key: &Keypair,
+        signing_key: &BlockKeypair,
     ) -> Self {
         let transaction_root = HashDigest::new(&bincode::serialize(&transactions).unwrap());
         let header = Header::new(
@@ -57,7 +58,8 @@ impl Block {
         Self {
             header,
             transactions,
-            signature: Signature::new(&msg, signing_key),
+            signing_key: signing_key.clone(),
+            signature: Signature::new(&msg, &signing_key),
         }
     }
 
@@ -72,13 +74,9 @@ impl Block {
     }
 
     // After merging Aleph consensus algorithm, it would be implemented
-    pub fn verify(&self, signing_key: &Keypair) -> bool {
-        println!("header = {:?}", self.header);
+    pub fn verify(&self) -> bool {
         let msg: Vec<u8> = format_header(&self.header);
-        println!("msg = {:?}", msg);
-        println!("Public key {:?}", signing_key.public());
-        println!("sig = {:?}", self.signature.as_string());
-        self.signature.verify(&msg, signing_key)
+        self.signature.verify(&msg, &self.signing_key)
     }
 }
 
@@ -114,17 +112,27 @@ mod tests {
         let transactions = vec![Transaction::new(
             local_id,
             json!("Hello First Transaction"),
-            &keypair,
+            &BlockKeypair::new(&keypair),
         )];
-        let block = Block::new(HashDigest::new(b""), 1, transactions.to_vec(), &keypair);
+        let block = Block::new(
+            HashDigest::new(b""),
+            1,
+            transactions.to_vec(),
+            &BlockKeypair::new(&keypair),
+        );
         let signature = keypair.sign(&bincode::serialize(&block.header.hash()).unwrap());
-        let expected_signature =
-            Signature::new(&bincode::serialize(&block.header.hash()).unwrap(), &keypair);
+        let expected_signature = Signature::new(
+            &bincode::serialize(&block.header.hash()).unwrap(),
+            &BlockKeypair::new(&keypair),
+        );
 
         assert_eq!(1, block.header.ordinal);
         assert_eq!(expected_signature.as_string(), block.signature());
-        assert!(keypair.public().verify(&bincode::serialize(&block.header.hash()).unwrap(), &signature));
-        assert!(block.verify(&keypair));
+        assert!(keypair.public().verify(
+            &bincode::serialize(&block.header.hash()).unwrap(),
+            &signature
+        ));
+        assert!(block.verify());
         Ok(())
     }
 }

@@ -14,6 +14,7 @@
    limitations under the License.
 */
 
+use crate::blockchain::BlockKeypair;
 use aleph_bft::{NodeCount, NodeIndex, PartialMultisignature};
 use async_trait::async_trait;
 use libp2p::core::identity::ed25519::PublicKey;
@@ -101,7 +102,10 @@ mod tests {
     #[tokio::test]
     async fn test_key_box_self_signed() {
         let key_box = KeyBox::new(
-            AuthorityPen::new(0.into(), Keypair::generate()),
+            AuthorityPen::new(
+                0.into(),
+                BlockKeypair::new(&Keypair::generate()),
+            ),
             AuthorityVerifier::new(),
         );
         let sign: Signature = key_box.sign(b"hello world!").await;

@@ -14,6 +14,7 @@
    limitations under the License.
 */
 
+use crate::blockchain::BlockKeypair;
 use aleph_bft::SignatureSet;
 use codec::{Decode, Encode};
 use libp2p::core::identity::ed25519::Keypair;
@@ -46,12 +47,17 @@ impl Signature {
         let sig = ed25519_dalek::Signature::from_bytes(msg)?;
         Ok(Self { signature: sig })
     }
-    pub fn to_bytes(self) -> [u8; ed25519_dalek::Signature::BYTE_SIZE] {
+    pub fn to_bytes(&self) -> [u8; ed25519_dalek::Signature::BYTE_SIZE] {
         self.signature.to_bytes()
     }
-    pub fn new(msg: &[u8], keypair: &Keypair) -> Self {
-        let signed: Vec<u8> = keypair.sign(msg);
-        Signature::from_bytes(&signed).expect("signed data should always be valid")
+    pub fn new(msg: &[u8], keypair: &BlockKeypair) -> Self {
+        let sig: ed25519_dalek::Signature =
+            ed25519_dalek::Signature::from_bytes(&keypair.sign(msg)).unwrap();
+        Self { signature: sig }
+    }
+    pub fn verify(&self, msg: &Vec<u8>, keypair: &BlockKeypair) -> bool {
+        let sig: Vec<u8> = self.to_bytes().iter().cloned().collect();
+        keypair.verify(msg, &sig)
     }
 }
 
@@ -70,6 +76,8 @@ pub type MultiSignature = SignatureSet<Signature>;
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn test_signature_verify() {}
 
     #[test]
     fn test_signature_encode() {
