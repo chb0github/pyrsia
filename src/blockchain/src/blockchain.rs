@@ -65,7 +65,9 @@ impl Serialize for BlockKeypair {
 impl FromStr for BlockKeypair {
     type Err = String;
     fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
-        Ok(BlockKeypair{0: Keypair::generate()})
+        Ok(BlockKeypair {
+            0: Keypair::generate(),
+        })
     }
 }
 
@@ -845,8 +847,13 @@ pub fn build_path_for_block(block: &Block) -> String {
 
 pub fn write_block(block: &Block) -> Result<()> {
     use std::fs::File;
+    use std::io::BufWriter;
+    use std::io::Write;
     let path = build_path_for_block(&block);
-    Ok(serde_json::to_writer(&File::create(path)?, &block)?)
+    let mut w = BufWriter::new(File::create(path)?);
+    serde_json::to_writer_pretty(&mut w, &block)?;
+    w.flush()?;
+    Ok(())
 }
 
 pub fn write_keypair(path: &str, data: &[u8; 64]) {
