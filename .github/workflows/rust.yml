@@ -4,6 +4,13 @@ on:
   push:
     branches: [ main ]
   pull_request:
+    paths: # Make sure to keep sync'd https://github.com/pyrsia/pyrsia/blob/main/.github/workflows/rust-lint-skipped.yml#L8
+      - .github/workflows/rust.yml
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - Cargo.lock
+  release: 
+    types: [published]
 
 env:
   CARGO_TERM_COLOR: always
@@ -19,7 +26,7 @@ jobs:
     - uses: actions/checkout@v3
   
     # Use sscache store in GitHub cache
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       with:
         path: /Users/runner/Library/Caches/Mozilla.sccache
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
@@ -29,10 +36,6 @@ jobs:
         .github/workflows/sccache-macos.sh
         sccache --start-server
         sccache --show-stats
-
-    - name: Install openssl on macOS
-      run: |
-        brew install openssl
 
     # Need to add build number to version number
     - name: Add Build to Version Number
@@ -46,9 +49,12 @@ jobs:
 
     - name: Execute Test Cases
       run: |
-        cargo test --workspace --verbose
+        cargo test --workspace --verbose --release
 
   build-push-linux:
+    permissions:
+      contents: 'read'
+      id-token: 'write'
     runs-on: ubuntu-latest
     env:
       RUSTC_WRAPPER: /home/runner/.cargo/bin/sccache
@@ -57,7 +63,7 @@ jobs:
     - uses: actions/checkout@v3
 
     # Use sscache store in GitHub cache
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       with:
         path: /home/runner/.cache/sccache
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
@@ -67,13 +73,6 @@ jobs:
         .github/workflows/sccache-linux.sh
         sccache --start-server
         sccache --show-stats
-
-    # Install cargo deb and strip
-    - name: Install cargo-deb cargo-strip
-      uses: actions-rs/cargo@v1.0.3
-      with:
-        command: install
-        args: cargo-deb cargo-strip --force
 
     # Need to add build number to version number
     - name: Add Build to Version Number
@@ -88,39 +87,59 @@ jobs:
 
     - name: Execute Test Cases
       run: |
-        cargo test --workspace --verbose
+        cargo test --workspace --verbose --release
+
+    # Install cargo deb and strip
+    - name: Install cargo-deb cargo-strip
+      if: github.repository_owner == 'pyrsia' && (github.event_name == 'push' || github.event_name == 'release') 
+      uses: actions-rs/cargo@v1.0.3
+      with:
+        command: install
+        args: cargo-deb cargo-strip --force
 
     # Strip binaries 
     - name: Strip Binaries
+      if: github.repository_owner == 'pyrsia' && (github.event_name == 'push' || github.event_name == 'release')   
       run: |
         cargo strip
 
     # Create Pyrsia .deb file
     - name: Package Pyrsia as deb file
+      if: github.repository_owner == 'pyrsia' && (github.event_name == 'push' || github.event_name == 'release')   
       uses: actions-rs/cargo@v1.0.3
       with:
         command: deb
         args: --no-build -v
 
-    # Add the prysia .deb file to the apt repo which is part of
-    # the github website repo
-    - name: Upload Pyrsia .deb to website repo
-      uses: sbtaylor15/apt-repo-action@v2.0.4
-      # Only when we push on the main repository should we upload the results
-      if: github.repository_owner == 'pyrsia' && github.event_name == 'push'
+    # Login to GCS
+    - name: Google Auth
+      if: github.repository_owner == 'pyrsia' && (github.event_name == 'push' || github.event_name == 'release')  
+      uses: 'google-github-actions/auth@v0'
       with:
-        github_token: ${{ secrets.APT }}
-        repo_supported_version: |
-          focal
-        repo_supported_arch: |
-          amd64
-        page_branch: gh-pages
-        file: /github/workspace/target/debian/pyrsia_0.1.0+${{ github.run_number }}_amd64.deb
-        file_target_version: focal
-        public_key: ${{ secrets.GPG_PUBLIC }}
-        private_key: ${{ secrets.GPG_PRIVATE }}
-        key_passphrase: ${{ secrets.GPG_SECRET }}
-        github_repository: pyrsia/pyrsia.github.io
+        workload_identity_provider: 'projects/679352079717/locations/global/workloadIdentityPools/pyrsia-pool/providers/github-provider'
+        service_account: 'pyrsia-ghaction@pyrsia-sandbox.iam.gserviceaccount.com'  
+
+    # Add gsutils
+    - name: Set up Cloud SDK
+      if: github.repository_owner == 'pyrsia' && (github.event_name == 'push' || github.event_name == 'release')  
+      uses: 'google-github-actions/setup-gcloud@v0'
+
+    # Add the prysia .deb file to the NIGHTLY apt repo which resides on GCS
+    - name: Publish Build to NIGHTLY GCS repo
+      if: github.repository_owner == 'pyrsia' && (github.event_name == 'push' || github.event_name == 'release')  
+      run: |
+        .github/workflows/aptly.sh target/debian/pyrsia_0.1.0+${{ github.run_number }}_amd64.deb nightly 
+      env: 
+        GPG_KEY: ${{ secrets.GPG_KEY }}
+    
+    # Add the prysia .deb file to the STABLE apt repo which resides on GCS
+    - name: Publish Release to STABLE GCS repo
+      # Only add to STABLE on publishing of a release
+      if: github.repository_owner == 'pyrsia' && github.event_name == 'release' 
+      run: |
+        .github/workflows/aptly.sh target/debian/pyrsia_0.1.0+${{ github.run_number }}_amd64.deb stable 
+      env: 
+        GPG_KEY: ${{ secrets.GPG_KEY }}
   
   # Coverage wipes the cache in order to instrument the code.  No need to wait for other jobs to run it.
   coverage:
@@ -142,7 +161,7 @@ jobs:
         args: '-- --test-threads 1'
 
     - name: Upload to codecov.io
-      uses: codecov/codecov-action@v2
+      uses: codecov/codecov-action@v3
       with:
         token: ${{secrets.CODECOV_TOKEN}}
         fail_ci_if_error: ${{ github.repository_owner == 'pyrsia' }}
@@ -158,26 +177,26 @@ jobs:
         fetch-depth: 2
 
     - name: Login to DockerHub
-      uses: docker/login-action@v1
+      uses: docker/login-action@v2
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
     - name: Build and Push Docker Image for Pyrsia Node
-      uses: docker/build-push-action@v2
+      uses: docker/build-push-action@v3
       with:
         context: .
         push: true
         file: installers/docker/AptGet.Dockerfile
-        tags: pyrsiaoss/pyrsia-node:latest
+        tags: pyrsiaoss/pyrsia-node:0.1.0-${{ github.run_number }}
 
     - name: Only build if CodeCoverage.Dockerfile changed
-      uses: tj-actions/changed-files@v18.1
+      uses: tj-actions/changed-files@v27
       id: changed-files
 
     - name: Build and Push Code Coverage Base Image
       if: contains(steps.changed-files.outputs.all_changed_and_modified_files, 'CodeCoverage.Dockerfile')
-      uses: docker/build-push-action@v2
+      uses: docker/build-push-action@v3
       with:
         context: .
         push: true
